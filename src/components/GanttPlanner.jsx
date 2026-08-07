@@ -44,7 +44,7 @@ export default function GanttPlanner({ tasks, users, currentUser, onTasksUpdated
     }
   };
 
-  const handleCreateTask = (e) => {
+  const handleCreateTask = async (e) => {
     e.preventDefault();
     if (!title.trim() || selectedAssigneeIds.length === 0) {
       alert('Пожалуйста, введите название и выберите хотя бы одного исполнителя!');
@@ -54,7 +54,7 @@ export default function GanttPlanner({ tasks, users, currentUser, onTasksUpdated
     const assignedUsers = users.filter(u => selectedAssigneeIds.includes(u.id));
     const assignedToNames = assignedUsers.map(u => u.name);
 
-    StorageService.createTask({
+    await StorageService.createTask({
       title: title.trim(),
       description: description.trim(),
       assignedToIds: selectedAssigneeIds,
@@ -73,15 +73,15 @@ export default function GanttPlanner({ tasks, users, currentUser, onTasksUpdated
     setSelectedAssigneeIds([]);
   };
 
-  const handleDeleteTask = (taskId) => {
+  const handleDeleteTask = async (taskId) => {
     if (confirm('Удалить эту задачу?')) {
-      StorageService.deleteTask(taskId);
+      await StorageService.deleteTask(taskId);
       onTasksUpdated();
     }
   };
 
-  const handleApproveCompletion = (taskId) => {
-    StorageService.updateTaskStatus(
+  const handleApproveCompletion = async (taskId) => {
+    await StorageService.updateTaskStatus(
       taskId, 
       'completed', 
       'Задача принята руководителем. Работы завершены на 100%.', 

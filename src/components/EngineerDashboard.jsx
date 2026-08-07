@@ -37,11 +37,11 @@ export default function EngineerDashboard({ tasks, currentUser, onTasksUpdated }
     setReportText('');
   };
 
-  const handleSubmitReport = (e) => {
+  const handleSubmitReport = async (e) => {
     e.preventDefault();
     if (!selectedTask) return;
 
-    StorageService.updateTaskStatus(
+    await StorageService.updateTaskStatus(
       selectedTask.id, 
       targetStatus, 
       reportText.trim() || `Обновлена процентовка выполнения: ${progressVal}%`, 

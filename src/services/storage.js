@@ -324,9 +324,9 @@ export const StorageService = {
     return users.filter(u => u.id !== 'user-admin' && u.role !== 'Admin');
   },
 
-  saveUsers: (users) => {
+  saveUsers: async (users) => {
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-    CloudSyncService.pushToCloud();
+    await CloudSyncService.pushToCloud();
   },
 
   updateUserAvatar: (userId, avatarDataUrl) => {
@@ -425,9 +425,9 @@ export const StorageService = {
     }
   },
 
-  saveTasks: (tasks) => {
+  saveTasks: async (tasks) => {
     localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(tasks));
-    CloudSyncService.pushToCloud();
+    await CloudSyncService.pushToCloud();
   },
 
   createTask: (newTaskData) => {
@@ -492,9 +492,9 @@ export const StorageService = {
     }
   },
 
-  saveTravelData: (travelData) => {
+  saveTravelData: async (travelData) => {
     localStorage.setItem(STORAGE_KEYS.TRAVEL, JSON.stringify(travelData));
-    CloudSyncService.pushToCloud();
+    await CloudSyncService.pushToCloud();
   },
 
   toggleTravelDay: (monthYearStr, userId, dayNumber) => {
