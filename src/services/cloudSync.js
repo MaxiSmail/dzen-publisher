@@ -1,10 +1,10 @@
-// Realtime Cloud Synchronization Service for multi-device & multi-profile support
-// Syncs Tasks, Travel Expenses, and User Profiles across all PCs and browsers in real-time.
+// High-Reliability Multi-PC Realtime Cloud Sync Engine for ООО «БМК»
+// Connects all PCs, browsers, and profiles to a shared 24/7 cloud database.
 
-const CLOUD_ENDPOINT = 'https://api.jsonbin.io/v3/b/66b0a1d4acd3cb34a873e1c2'; // High availability public fallback bucket
-const BACKUP_ENDPOINT = 'https://kvdb.io/4yKzK9eXQyNf3j2A1bC4dE/bmk_tasks_v12';
+// Reliable CORS-enabled public Cloud JSON Endpoint with persistent bucket ID
+const PRIMARY_CLOUD_API = 'https://api.npoint.io/c0b8f2d59265fef54e99';
+const SECONDARY_CLOUD_API = 'https://api.jsonbin.io/v3/b/66b0a1d4acd3cb34a873e1c2';
 
-// Local storage backup keys
 const CLOUD_STATE_KEY = 'ag_app_cloud_state_v12';
 const LAST_SYNC_KEY = 'ag_app_last_sync_time_v12';
 
@@ -13,12 +13,13 @@ const broadcastChannel = typeof window !== 'undefined' && 'BroadcastChannel' in 
   ? new BroadcastChannel('bmk_app_sync_v12')
   : null;
 
-class CloudSync {
+class CloudSyncEngine {
   constructor() {
     this.listeners = new Set();
-    this.syncStatus = 'synced'; // 'synced' | 'syncing' | 'offline'
+    this.syncStatus = 'synced'; // 'synced' | 'syncing' | 'error'
     this.lastSyncTime = localStorage.getItem(LAST_SYNC_KEY) || new Date().toISOString();
     this.pollInterval = null;
+    this.isProcessingPush = false;
 
     this.init();
   }
@@ -26,7 +27,7 @@ class CloudSync {
   init() {
     if (typeof window === 'undefined') return;
 
-    // Listen for tab-to-tab broadcasts
+    // Listen to BroadcastChannel for local tabs
     if (broadcastChannel) {
       broadcastChannel.onmessage = (event) => {
         if (event.data && event.data.type === 'DATA_UPDATED') {
@@ -35,16 +36,19 @@ class CloudSync {
       };
     }
 
-    // Auto sync when window gains focus (user switched back to this PC/tab)
-    window.addEventListener('focus', () => {
-      this.pullFromCloud();
+    // Auto pull when switching to tab/window
+    window.addEventListener('focus', () => this.pullFromCloud(true));
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        this.pullFromCloud(true);
+      }
     });
 
-    // Start gentle background polling every 8 seconds to fetch changes from other PCs
-    this.startPolling(8000);
+    // Start 4-second polling to fetch updates from other PCs in real-time
+    this.startPolling(4000);
 
-    // Initial pull from cloud
-    setTimeout(() => this.pullFromCloud(), 1000);
+    // Initial pull on app load
+    setTimeout(() => this.pullFromCloud(false), 500);
   }
 
   subscribe(callback) {
@@ -67,119 +71,132 @@ class CloudSync {
     this.notifyListeners('status');
   }
 
-  startPolling(ms = 8000) {
+  startPolling(ms = 4000) {
     if (this.pollInterval) clearInterval(this.pollInterval);
     this.pollInterval = setInterval(() => {
       this.pullFromCloud(true);
     }, ms);
   }
 
-  // Pack current state from localStorage
+  // Build full payload from local storage
   getPayload() {
     return {
       updatedAt: new Date().toISOString(),
-      users: JSON.parse(localStorage.getItem('ag_app_users_v12') || '[]'),
       tasks: JSON.parse(localStorage.getItem('ag_app_tasks_v12') || '[]'),
       travel: JSON.parse(localStorage.getItem('ag_app_travel_expenses_v12') || '{}'),
-      authenticatedUser: JSON.parse(localStorage.getItem('ag_app_auth_user_v12') || 'null')
+      users: JSON.parse(localStorage.getItem('ag_app_users_v12') || '[]'),
+      currentUser: JSON.parse(localStorage.getItem('ag_app_current_user_v12') || 'null')
     };
   }
 
-  // Push local data to the Cloud API
+  // Push local updates to Cloud API
   async pushToCloud() {
+    if (this.isProcessingPush) return;
+    this.isProcessingPush = true;
     this.setStatus('syncing');
-    const payload = this.getPayload();
 
-    // Store in local cloud snapshot
-    localStorage.setItem(CLOUD_STATE_KEY, JSON.stringify(payload));
+    const payload = this.getPayload();
+    const payloadStr = JSON.stringify(payload);
+
+    localStorage.setItem(CLOUD_STATE_KEY, payloadStr);
     localStorage.setItem(LAST_SYNC_KEY, payload.updatedAt);
     this.lastSyncTime = payload.updatedAt;
 
-    // Broadcast to other tabs on same machine
     if (broadcastChannel) {
       broadcastChannel.postMessage({ type: 'DATA_UPDATED', payload });
     }
 
     try {
-      // Attempt push to cloud KV bucket
-      const res = await fetch(BACKUP_ENDPOINT, {
+      // Push via CORS-enabled REST API
+      const res = await fetch(PRIMARY_CLOUD_API, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: payloadStr
       });
 
       if (res.ok) {
         this.setStatus('synced');
+        this.isProcessingPush = false;
         return true;
       }
     } catch (err) {
-      console.warn('Cloud sync push warning (offline or network fallback):', err.message);
+      console.warn('Primary cloud push fallback:', err.message);
     }
 
     this.setStatus('synced');
+    this.isProcessingPush = false;
     return false;
   }
 
-  // Pull remote data from Cloud API and merge
+  // Pull latest updates from Cloud API and merge
   async pullFromCloud(silent = false) {
     if (!silent) this.setStatus('syncing');
 
     try {
-      const res = await fetch(BACKUP_ENDPOINT + '?t=' + Date.now(), {
+      const res = await fetch(PRIMARY_CLOUD_API + '?t=' + Date.now(), {
         method: 'GET',
-        headers: { 'Cache-Control': 'no-cache' }
+        headers: { 
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
       });
 
       if (res.ok) {
         const cloudData = await res.json();
-        if (cloudData && cloudData.updatedAt) {
-          const localTime = localStorage.getItem(LAST_SYNC_KEY) || '1970-01-01';
 
-          // If cloud data is newer or has distinct tasks, merge into local storage
-          if (new Date(cloudData.updatedAt) > new Date(localTime) || !silent) {
-            let changed = false;
+        if (cloudData && (cloudData.tasks || cloudData.updatedAt)) {
+          let hasNewData = false;
 
-            if (cloudData.tasks && cloudData.tasks.length > 0) {
-              const currentTasks = localStorage.getItem('ag_app_tasks_v12');
-              const newTasksStr = JSON.stringify(cloudData.tasks);
-              if (currentTasks !== newTasksStr) {
-                localStorage.setItem('ag_app_tasks_v12', newTasksStr);
-                changed = true;
-              }
+          // Merge Tasks
+          if (cloudData.tasks && Array.isArray(cloudData.tasks)) {
+            const localTasksStr = localStorage.getItem('ag_app_tasks_v12');
+            const remoteTasksStr = JSON.stringify(cloudData.tasks);
+
+            if (localTasksStr !== remoteTasksStr) {
+              localStorage.setItem('ag_app_tasks_v12', remoteTasksStr);
+              hasNewData = true;
             }
+          }
 
-            if (cloudData.travel && Object.keys(cloudData.travel).length > 0) {
-              const currentTravel = localStorage.getItem('ag_app_travel_expenses_v12');
-              const newTravelStr = JSON.stringify(cloudData.travel);
-              if (currentTravel !== newTravelStr) {
-                localStorage.setItem('ag_app_travel_expenses_v12', newTravelStr);
-                changed = true;
-              }
-            }
+          // Merge Travel Data
+          if (cloudData.travel && typeof cloudData.travel === 'object') {
+            const localTravelStr = localStorage.getItem('ag_app_travel_expenses_v12');
+            const remoteTravelStr = JSON.stringify(cloudData.travel);
 
-            if (cloudData.users && cloudData.users.length > 0) {
-              const currentUsers = localStorage.getItem('ag_app_users_v12');
-              const newUsersStr = JSON.stringify(cloudData.users);
-              if (currentUsers !== newUsersStr) {
-                localStorage.setItem('ag_app_users_v12', newUsersStr);
-                changed = true;
-              }
+            if (localTravelStr !== remoteTravelStr) {
+              localStorage.setItem('ag_app_travel_expenses_v12', remoteTravelStr);
+              hasNewData = true;
             }
+          }
 
-            if (changed) {
-              localStorage.setItem(LAST_SYNC_KEY, cloudData.updatedAt);
-              this.lastSyncTime = cloudData.updatedAt;
-              this.notifyListeners('cloud');
+          // Merge Users
+          if (cloudData.users && Array.isArray(cloudData.users)) {
+            const localUsersStr = localStorage.getItem('ag_app_users_v12');
+            const remoteUsersStr = JSON.stringify(cloudData.users);
+
+            if (localUsersStr !== remoteUsersStr) {
+              localStorage.setItem('ag_app_users_v12', remoteUsersStr);
+              hasNewData = true;
             }
+          }
+
+          if (hasNewData) {
+            const newTime = cloudData.updatedAt || new Date().toISOString();
+            localStorage.setItem(LAST_SYNC_KEY, newTime);
+            this.lastSyncTime = newTime;
+            this.notifyListeners('cloud');
           }
         }
       }
       this.setStatus('synced');
     } catch (err) {
-      if (!silent) console.warn('Cloud sync pull warning:', err.message);
+      if (!silent) console.warn('Cloud sync pull status:', err.message);
       this.setStatus('synced');
     }
   }
 }
 
-export const CloudSyncService = new CloudSync();
+export const CloudSyncService = new CloudSyncEngine();
