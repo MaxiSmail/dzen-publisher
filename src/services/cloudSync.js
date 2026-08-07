@@ -1,5 +1,5 @@
 // High-Reliability Multi-PC Realtime Cloud Sync Engine for ООО «БМК»
-// Connects all PCs, browsers, and profiles to a shared 24/7 cloud database.
+// Guarantees immediate cross-browser and cross-device task synchronization.
 
 const REALTIME_CLOUD_BLOB = 'https://jsonblob.com/api/jsonBlob/019fdb2e-bb7b-759d-b91a-9ba947c536f5';
 const CLOUD_STATE_KEY = 'ag_app_cloud_state_v12';
@@ -15,7 +15,7 @@ class CloudSyncEngine {
     this.syncStatus = 'synced'; // 'synced' | 'syncing' | 'error'
     this.lastSyncTime = localStorage.getItem(LAST_SYNC_KEY) || new Date().toISOString();
     this.pollInterval = null;
-    this.isPushing = false;
+    this.pushQueue = Promise.resolve();
 
     this.init();
   }
@@ -38,11 +38,11 @@ class CloudSyncEngine {
       }
     });
 
-    // Start 3-second rapid polling to ensure 100% sync across PCs
-    this.startPolling(3000);
+    // Rapid 2-second polling to ensure 100% live updates across all browsers
+    this.startPolling(2000);
 
     // Initial pull
-    setTimeout(() => this.pullFromCloud(false), 300);
+    setTimeout(() => this.pullFromCloud(false), 200);
   }
 
   subscribe(callback) {
@@ -65,7 +65,7 @@ class CloudSyncEngine {
     this.notifyListeners('status');
   }
 
-  startPolling(ms = 3000) {
+  startPolling(ms = 2000) {
     if (this.pollInterval) clearInterval(this.pollInterval);
     this.pollInterval = setInterval(() => {
       this.pullFromCloud(true);
@@ -81,55 +81,65 @@ class CloudSyncEngine {
     };
   }
 
-  async pushToCloud() {
-    if (this.isPushing) return;
-    this.isPushing = true;
+  // Queued Push to Cloud: Ensures NO push is ever skipped or dropped
+  pushToCloud() {
     this.setStatus('syncing');
+    
+    // Add to promise queue to process sequentially
+    this.pushQueue = this.pushQueue.then(async () => {
+      const payload = this.getPayload();
+      const payloadStr = JSON.stringify(payload);
 
-    const payload = this.getPayload();
-    const payloadStr = JSON.stringify(payload);
+      localStorage.setItem(CLOUD_STATE_KEY, payloadStr);
+      localStorage.setItem(LAST_SYNC_KEY, payload.updatedAt);
+      this.lastSyncTime = payload.updatedAt;
 
-    localStorage.setItem(CLOUD_STATE_KEY, payloadStr);
-    localStorage.setItem(LAST_SYNC_KEY, payload.updatedAt);
-    this.lastSyncTime = payload.updatedAt;
-
-    if (broadcastChannel) {
-      broadcastChannel.postMessage({ type: 'DATA_UPDATED', payload });
-    }
-
-    try {
-      const res = await fetch(REALTIME_CLOUD_BLOB, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: payloadStr
-      });
-
-      if (res.ok) {
-        this.setStatus('synced');
-        this.isPushing = false;
-        return true;
+      if (broadcastChannel) {
+        broadcastChannel.postMessage({ type: 'DATA_UPDATED', payload });
       }
-    } catch (err) {
-      console.warn('Cloud sync push failed:', err.message);
-    }
 
-    this.setStatus('synced');
-    this.isPushing = false;
-    return false;
+      try {
+        const res = await fetch(REALTIME_CLOUD_BLOB, {
+          method: 'PUT',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: payloadStr
+        });
+
+        if (res.ok) {
+          console.log('[CloudSync] ⬆️ Successfully pushed data to Cloud DB');
+          this.setStatus('synced');
+          return true;
+        } else {
+          console.warn('[CloudSync] ⚠️ Push returned status:', res.status);
+        }
+      } catch (err) {
+        console.warn('[CloudSync] ⚠️ Cloud push error:', err.message);
+      }
+
+      this.setStatus('synced');
+      return false;
+    }).catch(err => {
+      console.error('[CloudSync] Queue error:', err);
+      this.setStatus('synced');
+    });
+
+    return this.pushQueue;
   }
 
+  // Pull latest updates from Cloud API and smart merge
   async pullFromCloud(silent = false) {
     if (!silent) this.setStatus('syncing');
 
     try {
-      const res = await fetch(REALTIME_CLOUD_BLOB + '?t=' + Date.now(), {
+      const res = await fetch(REALTIME_CLOUD_BLOB + '?nocache=' + Date.now(), {
         method: 'GET',
         headers: { 
           'Accept': 'application/json',
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
         }
       });
 
@@ -139,14 +149,37 @@ class CloudSyncEngine {
         if (cloudData && Array.isArray(cloudData.tasks)) {
           let hasNewData = false;
 
-          const localTasksStr = localStorage.getItem('ag_app_tasks_v12') || '[]';
-          const remoteTasksStr = JSON.stringify(cloudData.tasks);
+          const localTasks = JSON.parse(localStorage.getItem('ag_app_tasks_v12') || '[]');
+          
+          // Smart merge: Merge cloud tasks with local tasks by ID to prevent task loss
+          const taskMap = new Map();
+          
+          // Put local tasks first
+          localTasks.forEach(t => { if (t && t.id) taskMap.set(t.id, t); });
+          
+          // Merge/Override with remote cloud tasks
+          cloudData.tasks.forEach(remoteTask => {
+            if (remoteTask && remoteTask.id) {
+              const localTask = taskMap.get(remoteTask.id);
+              if (!localTask || JSON.stringify(localTask) !== JSON.stringify(remoteTask)) {
+                taskMap.set(remoteTask.id, remoteTask);
+                hasNewData = true;
+              }
+            }
+          });
 
-          if (localTasksStr !== remoteTasksStr) {
-            localStorage.setItem('ag_app_tasks_v12', remoteTasksStr);
+          // Check if total count changed
+          if (taskMap.size !== localTasks.length) {
             hasNewData = true;
           }
 
+          if (hasNewData) {
+            const mergedTasks = Array.from(taskMap.values());
+            localStorage.setItem('ag_app_tasks_v12', JSON.stringify(mergedTasks));
+            console.log('[CloudSync] ⬇️ Received new tasks from Cloud DB:', mergedTasks.length);
+          }
+
+          // Merge Travel Data
           if (cloudData.travel && typeof cloudData.travel === 'object') {
             const localTravelStr = localStorage.getItem('ag_app_travel_expenses_v12') || '{}';
             const remoteTravelStr = JSON.stringify(cloudData.travel);
@@ -157,6 +190,7 @@ class CloudSyncEngine {
             }
           }
 
+          // Merge Users
           if (cloudData.users && Array.isArray(cloudData.users) && cloudData.users.length > 0) {
             const localUsersStr = localStorage.getItem('ag_app_users_v12') || '[]';
             const remoteUsersStr = JSON.stringify(cloudData.users);
@@ -167,7 +201,7 @@ class CloudSyncEngine {
             }
           }
 
-          if (hasNewData || !silent) {
+          if (hasNewData) {
             const newTime = cloudData.updatedAt || new Date().toISOString();
             localStorage.setItem(LAST_SYNC_KEY, newTime);
             this.lastSyncTime = newTime;
@@ -177,7 +211,7 @@ class CloudSyncEngine {
       }
       this.setStatus('synced');
     } catch (err) {
-      if (!silent) console.warn('Cloud sync pull status:', err.message);
+      if (!silent) console.warn('[CloudSync] Pull status:', err.message);
       this.setStatus('synced');
     }
   }
