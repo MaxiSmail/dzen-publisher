@@ -18,7 +18,7 @@ export const siteData = {
       "images": [
         {
           "src": "https://bmk-company.ru/files/gallery/94/main/grant-stroy_1664983587.jpg",
-          "alt": "Генеральный подряд - ООО 'Грант-Строй'"
+          "alt": "Генеральный подряд - ООО 'БМК'"
         },
         {
           "src": "https://bmk-company.ru/files/gallery/72/main/agrotech-garant_1663759190.jpg",
