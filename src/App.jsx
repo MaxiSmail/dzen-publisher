@@ -5,6 +5,7 @@ import GanttPlanner from './components/GanttPlanner';
 import TravelAllowanceCalculator from './components/TravelAllowanceCalculator';
 import EngineerDashboard from './components/EngineerDashboard';
 import { StorageService } from './services/storage';
+import { CloudSyncService } from './services/cloudSync';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(StorageService.getCurrentUser());
@@ -18,6 +19,15 @@ export default function App() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', currentTheme);
   }, [currentTheme]);
+
+  useEffect(() => {
+    const unsubscribe = CloudSyncService.subscribe(({ source }) => {
+      if (source === 'remote' || source === 'cloud') {
+        handleDataRefresh();
+      }
+    });
+    return unsubscribe;
+  }, []);
 
   const handleThemeChange = (newTheme) => {
     StorageService.setTheme(newTheme);

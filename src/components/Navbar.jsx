@@ -2,9 +2,11 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { 
   Users, Calendar, FileSpreadsheet, Sparkles,
-  Sun, Moon, Palette, Camera, LogOut, ShieldCheck, Eye
+  Sun, Moon, Palette, Camera, LogOut, ShieldCheck, Eye,
+  RefreshCw, Cloud
 } from 'lucide-react';
 import bmkLogo from '../assets/bmk_logo.png';
+import { CloudSyncService } from '../services/cloudSync';
 
 export default function Navbar({ 
   currentUser, 
@@ -18,6 +20,21 @@ export default function Navbar({
   currentTheme,
   onThemeChange
 }) {
+  const [syncStatus, setSyncStatus] = React.useState(CloudSyncService.syncStatus);
+  const [isSyncing, setIsSyncing] = React.useState(false);
+
+  React.useEffect(() => {
+    const unsubscribe = CloudSyncService.subscribe(({ status }) => {
+      if (status) setSyncStatus(status);
+    });
+    return unsubscribe;
+  }, []);
+
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    await CloudSyncService.pullFromCloud();
+    setTimeout(() => setIsSyncing(false), 600);
+  };
 
   const handleSelectChange = (e) => {
     const selectedId = e.target.value;
@@ -86,6 +103,23 @@ export default function Navbar({
         {/* Right Section: Theme Selector, Profile Display & Logout */}
         <div className="flex items-center space-x-3">
           
+          {/* REALTIME CLOUD SYNC BUTTON */}
+          <button
+            onClick={handleManualSync}
+            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+              syncStatus === 'syncing' || isSyncing
+                ? 'bg-amber-950/50 border-amber-500/50 text-amber-300'
+                : 'bg-slate-800/90 border-slate-700/80 text-emerald-400 hover:border-emerald-500/50 hover:bg-slate-800'
+            }`}
+            title="Облачная синхронизация между всеми ПК и устройствами. Нажмите для принудительного обновления."
+          >
+            <Cloud className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">
+              {syncStatus === 'syncing' || isSyncing ? 'Облако...' : 'Облако 24/7'}
+            </span>
+            <RefreshCw className={`w-3 h-3 ${syncStatus === 'syncing' || isSyncing ? 'animate-spin text-amber-400' : 'text-slate-400'}`} />
+          </button>
+
           {/* THEME SWITCHER BUTTONS */}
           <div className="flex items-center space-x-1 bg-slate-800/90 p-1 rounded-xl border border-slate-700">
             <button

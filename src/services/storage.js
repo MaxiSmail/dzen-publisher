@@ -1,4 +1,4 @@
-// Storage service for managing local persistence and data sync
+import { CloudSyncService } from './cloudSync';
 
 const STORAGE_KEYS = {
   USERS: 'ag_app_users_v12',
@@ -326,6 +326,7 @@ export const StorageService = {
 
   saveUsers: (users) => {
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+    CloudSyncService.pushToCloud();
   },
 
   updateUserAvatar: (userId, avatarDataUrl) => {
@@ -426,6 +427,7 @@ export const StorageService = {
 
   saveTasks: (tasks) => {
     localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(tasks));
+    CloudSyncService.pushToCloud();
   },
 
   createTask: (newTaskData) => {
@@ -492,6 +494,7 @@ export const StorageService = {
 
   saveTravelData: (travelData) => {
     localStorage.setItem(STORAGE_KEYS.TRAVEL, JSON.stringify(travelData));
+    CloudSyncService.pushToCloud();
   },
 
   toggleTravelDay: (monthYearStr, userId, dayNumber) => {
