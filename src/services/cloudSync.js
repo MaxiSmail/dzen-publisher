@@ -1,7 +1,7 @@
 // High-Reliability Multi-PC Realtime Cloud Sync Engine for ООО «БМК»
-// Guarantees immediate cross-browser and cross-device task synchronization.
+// Connects all PCs, browsers, and profiles to a shared 24/7 cloud database.
 
-const REALTIME_CLOUD_BLOB = 'https://jsonblob.com/api/jsonBlob/019fdb2e-bb7b-759d-b91a-9ba947c536f5';
+const CLOUD_MASTER_ENDPOINT = 'https://api.restful-api.dev/objects/ff8081819f7e10ae019fdb3a70570896';
 const CLOUD_STATE_KEY = 'ag_app_cloud_state_v12';
 const LAST_SYNC_KEY = 'ag_app_last_sync_time_v12';
 
@@ -38,7 +38,7 @@ class CloudSyncEngine {
       }
     });
 
-    // Rapid 2-second polling to ensure 100% live updates across all browsers
+    // 2-second interval polling for 100% multi-PC sync
     this.startPolling(2000);
 
     // Initial pull
@@ -74,32 +74,34 @@ class CloudSyncEngine {
 
   getPayload() {
     return {
-      updatedAt: new Date().toISOString(),
-      tasks: JSON.parse(localStorage.getItem('ag_app_tasks_v12') || '[]'),
-      travel: JSON.parse(localStorage.getItem('ag_app_travel_expenses_v12') || '{}'),
-      users: JSON.parse(localStorage.getItem('ag_app_users_v12') || '[]')
+      name: 'BMK Management Master Storage v12',
+      data: {
+        updatedAt: new Date().toISOString(),
+        tasks: JSON.parse(localStorage.getItem('ag_app_tasks_v12') || '[]'),
+        travel: JSON.parse(localStorage.getItem('ag_app_travel_expenses_v12') || '{}'),
+        users: JSON.parse(localStorage.getItem('ag_app_users_v12') || '[]')
+      }
     };
   }
 
-  // Queued Push to Cloud: Ensures NO push is ever skipped or dropped
+  // Queued Push to Cloud: Ensures NO push is ever skipped
   pushToCloud() {
     this.setStatus('syncing');
-    
-    // Add to promise queue to process sequentially
+
     this.pushQueue = this.pushQueue.then(async () => {
       const payload = this.getPayload();
       const payloadStr = JSON.stringify(payload);
 
-      localStorage.setItem(CLOUD_STATE_KEY, payloadStr);
-      localStorage.setItem(LAST_SYNC_KEY, payload.updatedAt);
-      this.lastSyncTime = payload.updatedAt;
+      localStorage.setItem(CLOUD_STATE_KEY, JSON.stringify(payload.data));
+      localStorage.setItem(LAST_SYNC_KEY, payload.data.updatedAt);
+      this.lastSyncTime = payload.data.updatedAt;
 
       if (broadcastChannel) {
-        broadcastChannel.postMessage({ type: 'DATA_UPDATED', payload });
+        broadcastChannel.postMessage({ type: 'DATA_UPDATED', payload: payload.data });
       }
 
       try {
-        const res = await fetch(REALTIME_CLOUD_BLOB, {
+        const res = await fetch(CLOUD_MASTER_ENDPOINT, {
           method: 'PUT',
           headers: { 
             'Content-Type': 'application/json',
@@ -109,14 +111,14 @@ class CloudSyncEngine {
         });
 
         if (res.ok) {
-          console.log('[CloudSync] ⬆️ Successfully pushed data to Cloud DB');
+          console.log('[CloudSync] ⬆️ Successfully pushed tasks to Master Cloud DB');
           this.setStatus('synced');
           return true;
         } else {
-          console.warn('[CloudSync] ⚠️ Push returned status:', res.status);
+          console.warn('[CloudSync] ⚠️ Master Cloud push status:', res.status);
         }
       } catch (err) {
-        console.warn('[CloudSync] ⚠️ Cloud push error:', err.message);
+        console.warn('[CloudSync] ⚠️ Master Cloud push error:', err.message);
       }
 
       this.setStatus('synced');
@@ -134,7 +136,7 @@ class CloudSyncEngine {
     if (!silent) this.setStatus('syncing');
 
     try {
-      const res = await fetch(REALTIME_CLOUD_BLOB + '?nocache=' + Date.now(), {
+      const res = await fetch(CLOUD_MASTER_ENDPOINT + '?nocache=' + Date.now(), {
         method: 'GET',
         headers: { 
           'Accept': 'application/json',
@@ -144,20 +146,19 @@ class CloudSyncEngine {
       });
 
       if (res.ok) {
-        const cloudData = await res.json();
+        const rawJson = await res.json();
+        const cloudData = rawJson.data || rawJson;
 
         if (cloudData && Array.isArray(cloudData.tasks)) {
           let hasNewData = false;
 
           const localTasks = JSON.parse(localStorage.getItem('ag_app_tasks_v12') || '[]');
-          
-          // Smart merge: Merge cloud tasks with local tasks by ID to prevent task loss
           const taskMap = new Map();
-          
-          // Put local tasks first
+
+          // Local tasks first
           localTasks.forEach(t => { if (t && t.id) taskMap.set(t.id, t); });
-          
-          // Merge/Override with remote cloud tasks
+
+          // Merge remote tasks
           cloudData.tasks.forEach(remoteTask => {
             if (remoteTask && remoteTask.id) {
               const localTask = taskMap.get(remoteTask.id);
@@ -168,7 +169,6 @@ class CloudSyncEngine {
             }
           });
 
-          // Check if total count changed
           if (taskMap.size !== localTasks.length) {
             hasNewData = true;
           }
@@ -176,7 +176,7 @@ class CloudSyncEngine {
           if (hasNewData) {
             const mergedTasks = Array.from(taskMap.values());
             localStorage.setItem('ag_app_tasks_v12', JSON.stringify(mergedTasks));
-            console.log('[CloudSync] ⬇️ Received new tasks from Cloud DB:', mergedTasks.length);
+            console.log('[CloudSync] ⬇️ Received updated tasks from Master Cloud DB:', mergedTasks.length);
           }
 
           // Merge Travel Data
