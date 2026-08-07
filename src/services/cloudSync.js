@@ -1,14 +1,10 @@
 // High-Reliability Multi-PC Realtime Cloud Sync Engine for ООО «БМК»
 // Connects all PCs, browsers, and profiles to a shared 24/7 cloud database.
 
-// Reliable CORS-enabled public Cloud JSON Endpoint with persistent bucket ID
-const PRIMARY_CLOUD_API = 'https://api.npoint.io/c0b8f2d59265fef54e99';
-const SECONDARY_CLOUD_API = 'https://api.jsonbin.io/v3/b/66b0a1d4acd3cb34a873e1c2';
-
+const REALTIME_CLOUD_BLOB = 'https://jsonblob.com/api/jsonBlob/019fdb2e-bb7b-759d-b91a-9ba947c536f5';
 const CLOUD_STATE_KEY = 'ag_app_cloud_state_v12';
 const LAST_SYNC_KEY = 'ag_app_last_sync_time_v12';
 
-// BroadcastChannel for instant 0ms tab-to-tab sync on the same machine
 const broadcastChannel = typeof window !== 'undefined' && 'BroadcastChannel' in window
   ? new BroadcastChannel('bmk_app_sync_v12')
   : null;
@@ -19,7 +15,7 @@ class CloudSyncEngine {
     this.syncStatus = 'synced'; // 'synced' | 'syncing' | 'error'
     this.lastSyncTime = localStorage.getItem(LAST_SYNC_KEY) || new Date().toISOString();
     this.pollInterval = null;
-    this.isProcessingPush = false;
+    this.isPushing = false;
 
     this.init();
   }
@@ -27,7 +23,6 @@ class CloudSyncEngine {
   init() {
     if (typeof window === 'undefined') return;
 
-    // Listen to BroadcastChannel for local tabs
     if (broadcastChannel) {
       broadcastChannel.onmessage = (event) => {
         if (event.data && event.data.type === 'DATA_UPDATED') {
@@ -36,7 +31,6 @@ class CloudSyncEngine {
       };
     }
 
-    // Auto pull when switching to tab/window
     window.addEventListener('focus', () => this.pullFromCloud(true));
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
@@ -44,11 +38,11 @@ class CloudSyncEngine {
       }
     });
 
-    // Start 4-second polling to fetch updates from other PCs in real-time
-    this.startPolling(4000);
+    // Start 3-second rapid polling to ensure 100% sync across PCs
+    this.startPolling(3000);
 
-    // Initial pull on app load
-    setTimeout(() => this.pullFromCloud(false), 500);
+    // Initial pull
+    setTimeout(() => this.pullFromCloud(false), 300);
   }
 
   subscribe(callback) {
@@ -71,28 +65,25 @@ class CloudSyncEngine {
     this.notifyListeners('status');
   }
 
-  startPolling(ms = 4000) {
+  startPolling(ms = 3000) {
     if (this.pollInterval) clearInterval(this.pollInterval);
     this.pollInterval = setInterval(() => {
       this.pullFromCloud(true);
     }, ms);
   }
 
-  // Build full payload from local storage
   getPayload() {
     return {
       updatedAt: new Date().toISOString(),
       tasks: JSON.parse(localStorage.getItem('ag_app_tasks_v12') || '[]'),
       travel: JSON.parse(localStorage.getItem('ag_app_travel_expenses_v12') || '{}'),
-      users: JSON.parse(localStorage.getItem('ag_app_users_v12') || '[]'),
-      currentUser: JSON.parse(localStorage.getItem('ag_app_current_user_v12') || 'null')
+      users: JSON.parse(localStorage.getItem('ag_app_users_v12') || '[]')
     };
   }
 
-  // Push local updates to Cloud API
   async pushToCloud() {
-    if (this.isProcessingPush) return;
-    this.isProcessingPush = true;
+    if (this.isPushing) return;
+    this.isPushing = true;
     this.setStatus('syncing');
 
     const payload = this.getPayload();
@@ -107,9 +98,8 @@ class CloudSyncEngine {
     }
 
     try {
-      // Push via CORS-enabled REST API
-      const res = await fetch(PRIMARY_CLOUD_API, {
-        method: 'POST',
+      const res = await fetch(REALTIME_CLOUD_BLOB, {
+        method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
           'Accept': 'application/json'
@@ -119,24 +109,23 @@ class CloudSyncEngine {
 
       if (res.ok) {
         this.setStatus('synced');
-        this.isProcessingPush = false;
+        this.isPushing = false;
         return true;
       }
     } catch (err) {
-      console.warn('Primary cloud push fallback:', err.message);
+      console.warn('Cloud sync push failed:', err.message);
     }
 
     this.setStatus('synced');
-    this.isProcessingPush = false;
+    this.isPushing = false;
     return false;
   }
 
-  // Pull latest updates from Cloud API and merge
   async pullFromCloud(silent = false) {
     if (!silent) this.setStatus('syncing');
 
     try {
-      const res = await fetch(PRIMARY_CLOUD_API + '?t=' + Date.now(), {
+      const res = await fetch(REALTIME_CLOUD_BLOB + '?t=' + Date.now(), {
         method: 'GET',
         headers: { 
           'Accept': 'application/json',
@@ -147,23 +136,19 @@ class CloudSyncEngine {
       if (res.ok) {
         const cloudData = await res.json();
 
-        if (cloudData && (cloudData.tasks || cloudData.updatedAt)) {
+        if (cloudData && Array.isArray(cloudData.tasks)) {
           let hasNewData = false;
 
-          // Merge Tasks
-          if (cloudData.tasks && Array.isArray(cloudData.tasks)) {
-            const localTasksStr = localStorage.getItem('ag_app_tasks_v12');
-            const remoteTasksStr = JSON.stringify(cloudData.tasks);
+          const localTasksStr = localStorage.getItem('ag_app_tasks_v12') || '[]';
+          const remoteTasksStr = JSON.stringify(cloudData.tasks);
 
-            if (localTasksStr !== remoteTasksStr) {
-              localStorage.setItem('ag_app_tasks_v12', remoteTasksStr);
-              hasNewData = true;
-            }
+          if (localTasksStr !== remoteTasksStr) {
+            localStorage.setItem('ag_app_tasks_v12', remoteTasksStr);
+            hasNewData = true;
           }
 
-          // Merge Travel Data
           if (cloudData.travel && typeof cloudData.travel === 'object') {
-            const localTravelStr = localStorage.getItem('ag_app_travel_expenses_v12');
+            const localTravelStr = localStorage.getItem('ag_app_travel_expenses_v12') || '{}';
             const remoteTravelStr = JSON.stringify(cloudData.travel);
 
             if (localTravelStr !== remoteTravelStr) {
@@ -172,9 +157,8 @@ class CloudSyncEngine {
             }
           }
 
-          // Merge Users
-          if (cloudData.users && Array.isArray(cloudData.users)) {
-            const localUsersStr = localStorage.getItem('ag_app_users_v12');
+          if (cloudData.users && Array.isArray(cloudData.users) && cloudData.users.length > 0) {
+            const localUsersStr = localStorage.getItem('ag_app_users_v12') || '[]';
             const remoteUsersStr = JSON.stringify(cloudData.users);
 
             if (localUsersStr !== remoteUsersStr) {
@@ -183,7 +167,7 @@ class CloudSyncEngine {
             }
           }
 
-          if (hasNewData) {
+          if (hasNewData || !silent) {
             const newTime = cloudData.updatedAt || new Date().toISOString();
             localStorage.setItem(LAST_SYNC_KEY, newTime);
             this.lastSyncTime = newTime;
