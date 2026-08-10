@@ -4,9 +4,36 @@ import config
 import os
 import json
 
-def publish_to_vk(formatted_text: str, image_path: Path = None) -> bool:
+def create_vk_poll(question: str, options: list, group_id_int: int, token: str) -> str:
+    """Создание интерактивного опроса ВКонтакте через polls.create API."""
+    if not question or not options:
+        return None
+    try:
+        url = "https://api.vk.com/method/polls.create"
+        params = {
+            "owner_id": -group_id_int,
+            "question": question[:80],
+            "add_answers": json.dumps(options[:5], ensure_ascii=False),
+            "access_token": token,
+            "v": "5.131"
+        }
+        res = requests.post(url, data=params, timeout=15)
+        res.raise_for_status()
+        data = res.json()
+        if "response" in data:
+            poll_info = data["response"]
+            attachment_str = f"poll{poll_info['owner_id']}_{poll_info['id']}"
+            print(f"Опрос успешно создан в ВК: {attachment_str}")
+            return attachment_str
+        elif "error" in data:
+            print(f"⚠️ Ошибка создания опроса VK API: {data['error']['error_msg']}")
+    except Exception as e:
+        print(f"⚠️ Исключение при создании опроса в ВК: {e}")
+    return None
+
+def publish_to_vk(formatted_text: str, image_path: Path = None, poll_question: str = None, poll_options: list = None) -> bool:
     token = config.VK_ACCESS_TOKEN
-    group_id = config.VK_GROUP_ID # Идентификатор сообщества (число)
+    group_id = config.VK_GROUP_ID
     
     if not token or not group_id:
         print("Ошибка: VK_ACCESS_TOKEN или VK_GROUP_ID не заданы в .env!")
@@ -20,7 +47,9 @@ def publish_to_vk(formatted_text: str, image_path: Path = None) -> bool:
         
     print(f"Публикация поста во ВКонтакте в группу ID: {group_id_int}...")
     
-    attachment_str = None
+    attachments = []
+    
+    # 1. Загрузка обложки
     if image_path and Path(image_path).exists():
         try:
             print("[1/3] Получение сервера загрузки фото...")
@@ -60,13 +89,20 @@ def publish_to_vk(formatted_text: str, image_path: Path = None) -> bool:
                 
                 if "response" in save_data and len(save_data["response"]) > 0:
                     photo_info = save_data["response"][0]
-                    attachment_str = f"photo{photo_info['owner_id']}_{photo_info['id']}"
-                    print(f"Фото успешно загружено и прикреплено: {attachment_str}")
+                    photo_attachment = f"photo{photo_info['owner_id']}_{photo_info['id']}"
+                    attachments.append(photo_attachment)
+                    print(f"Фото успешно прикреплено: {photo_attachment}")
         except Exception as img_err:
-            print(f"⚠️ Не удалось загрузить картинку в ВК ({img_err}), публикую только текст поста.")
+            print(f"⚠️ Не удалось загрузить картинку в ВК ({img_err}).")
+
+    # 2. Создание интерактивного опроса
+    if poll_question and poll_options:
+        poll_attachment = create_vk_poll(poll_question, poll_options, group_id_int, token)
+        if poll_attachment:
+            attachments.append(poll_attachment)
 
     try:
-        print("Создание записи на стене...")
+        print("Создание записи на стене ВК...")
         post_url = "https://api.vk.com/method/wall.post"
         post_params = {
             "owner_id": -group_id_int,
@@ -75,8 +111,8 @@ def publish_to_vk(formatted_text: str, image_path: Path = None) -> bool:
             "access_token": token,
             "v": "5.131"
         }
-        if attachment_str:
-            post_params["attachments"] = attachment_str
+        if attachments:
+            post_params["attachments"] = ",".join(attachments)
             
         post_res = requests.post(post_url, data=post_params, timeout=20)
         post_res.raise_for_status()
@@ -92,3 +128,4 @@ def publish_to_vk(formatted_text: str, image_path: Path = None) -> bool:
     except Exception as e:
         print(f"Ошибка при публикации записи на стене ВК: {e}")
         return False
+

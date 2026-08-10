@@ -87,8 +87,10 @@ def run_mode_own_rss():
         print(f"Ошибка вызова генератора обложки: {e}")
         image_path = None
         
-    # Публикация
-    success = publisher.publish_to_vk(post_data["formatted_text"], image_path)
+    # Публикация с интерактивным опросом ВК
+    poll_q = post_data.get("poll_question")
+    poll_opts = post_data.get("poll_options")
+    success = publisher.publish_to_vk(post_data["formatted_text"], image_path, poll_question=poll_q, poll_options=poll_opts)
     if success:
         history.append(selected_article["link"])
         save_history(history)
@@ -99,7 +101,7 @@ def run_mode_own_rss():
                 Path(image_path).unlink()
             except:
                 pass
-        print("Утренняя публикация VK успешно завершена!")
+        print("Утренняя публикация VK с опросом успешно завершена!")
 
 def run_mode_dzen_adaptation():
     print("\n--- ЗАПУСК ДНЕВНОЙ АДАПТАЦИИ СТАТЬИ ДЗЕНА ДЛЯ VK ---")
@@ -143,8 +145,11 @@ def run_mode_dzen_adaptation():
         print(f"Ошибка вызова генератора обложки: {e}")
         image_path = None
         
-    # Публикация
-    success = publisher.publish_to_vk(post_data["formatted_text"], image_path)
+    # Публикация с интерактивным опросом ВК
+    poll_q = post_data.get("poll_question")
+    poll_opts = post_data.get("poll_options")
+    success = publisher.publish_to_vk(post_data["formatted_text"], image_path, poll_question=poll_q, poll_options=poll_opts)
+
     if success:
         history.append(link)
         save_history(history)

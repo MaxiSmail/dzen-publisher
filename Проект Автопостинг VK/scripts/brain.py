@@ -11,7 +11,7 @@ from google import genai
 from google.genai import types
 from google.genai.errors import APIError
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 import config
 
 class VKPost(BaseModel):
@@ -19,6 +19,9 @@ class VKPost(BaseModel):
     formatted_text: str
     image_prompt: str
     tags: List[str]
+    poll_question: Optional[str] = None
+    poll_options: Optional[List[str]] = None
+
 
 def get_gemini_client():
     if not config.GEMINI_API_KEY:
