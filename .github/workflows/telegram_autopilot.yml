@@ -1,0 +1,44 @@
+name: Telegram AI Channel Auto Poster
+
+on:
+  schedule:
+    # Запуск 2 раза в день: в 06:00 и 15:00 UTC (09:00 и 18:00 МСК)
+    - cron: '0 6,15 * * *'
+  # Возможность запустить вручную через вкладку Actions на GitHub
+  workflow_dispatch:
+
+jobs:
+  autopost:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r "Проект Автопостинг Telegram/scripts/requirements.txt"
+
+      - name: Run Telegram Autoposter
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          cd "Проект Автопостинг Telegram/scripts"
+          python main.py
+
+      - name: Commit updated history
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update telegram posted history [skip ci]"
+          file_pattern: "Проект Автопостинг Telegram/scripts/posted_history.json"

@@ -1,0 +1,67 @@
+name: Dzen AI Channel Auto Publisher
+
+on:
+  schedule:
+    # Ежедневный автоматический запуск по расписанию
+    - cron: '0 10 * * *'
+  # Кнопка мгновенного ручного запуска
+  workflow_dispatch:
+    inputs:
+      immediate:
+        description: 'Опубликовать немедленно без задержки'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r .agents/skills/dzen_publisher/scripts/requirements.txt
+          npx playwright install chromium --with-deps
+
+      - name: Run Dzen AI Publisher (Scheduled Random Delay)
+        if: github.event_name == 'schedule'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DZEN_SESSION_STATE: ${{ secrets.DZEN_SESSION_STATE }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          cd .agents/skills/dzen_publisher/scripts
+          python main.py --random-delay
+
+      - name: Run Dzen AI Publisher (Manual Immediate Run)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DZEN_SESSION_STATE: ${{ secrets.DZEN_SESSION_STATE }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          cd .agents/skills/dzen_publisher/scripts
+          python main.py
+
+      - name: Upload Artifacts (Screenshots & Logs)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dzen-publication-report
+          path: |
+            .agents/skills/dzen_publisher/scripts/latest_publication.png
+            .agents/skills/dzen_publisher/scripts/analytics_stats.png
+            .agents/skills/dzen_publisher/scripts/analytics_monetization.png
+            .agents/skills/dzen_publisher/scripts/error_screenshot.png
+            .agents/skills/dzen_publisher/scripts/analytics_history.json

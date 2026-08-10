@@ -1,0 +1,36 @@
+name: Telegram AI Channel Weekly SMM Analytics
+
+on:
+  schedule:
+    # Автоматический запуск каждый понедельник в 06:00 UTC (09:00 МСК)
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  weekly_report:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r "Проект Автопостинг Telegram/scripts/requirements.txt"
+
+      - name: Run Weekly SMM Analytics Report
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+        run: |
+          cd "Проект Автопостинг Telegram/scripts"
+          python weekly_report.py

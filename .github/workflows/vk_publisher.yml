@@ -1,0 +1,75 @@
+name: VK AI Channel Auto Publisher
+
+on:
+  schedule:
+    # Запуск утренней публикации в 06:00 UTC (09:00 МСК)
+    - cron: '0 6 * * *'
+    # Запуск адаптации Дзена в 10:50 UTC (13:50 МСК)
+    - cron: '50 10 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Режим запуска: own_rss или dzen_adaptation'
+        required: true
+        type: choice
+        options:
+          - own_rss
+          - dzen_adaptation
+        default: own_rss
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install feedparser beautifulsoup4 requests google-genai pydantic python-dotenv
+
+      - name: Run VK Publisher (Scheduled Morning - 09:00 MSK)
+        if: github.event_name == 'schedule' && github.event.schedule == '0 6 * * *'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          VK_ACCESS_TOKEN: ${{ secrets.VK_ACCESS_TOKEN }}
+          VK_GROUP_ID: ${{ secrets.VK_GROUP_ID }}
+        run: |
+          cd "Проект Автопостинг VK/scripts"
+          python main.py --mode own_rss
+
+      - name: Run VK Publisher (Scheduled Afternoon - 13:50 MSK)
+        if: github.event_name == 'schedule' && github.event.schedule == '50 10 * * *'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          VK_ACCESS_TOKEN: ${{ secrets.VK_ACCESS_TOKEN }}
+          VK_GROUP_ID: ${{ secrets.VK_GROUP_ID }}
+        run: |
+          cd "Проект Автопостинг VK/scripts"
+          python main.py --mode dzen_adaptation
+
+      - name: Run VK Publisher (Manual Run)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          VK_ACCESS_TOKEN: ${{ secrets.VK_ACCESS_TOKEN }}
+          VK_GROUP_ID: ${{ secrets.VK_GROUP_ID }}
+        run: |
+          cd "Проект Автопостинг VK/scripts"
+          python main.py --mode ${{ github.event.inputs.mode }}
+
+      - name: Commit updated history
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update vk posted history [skip ci]"
+          file_pattern: "Проект Автопостинг VK/scripts/posted_history.json"
