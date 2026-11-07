@@ -3,7 +3,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Загружаем переменные окружения из .env
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 # Базовая директория проекта
 BASE_DIR = Path(__file__).resolve().parent
