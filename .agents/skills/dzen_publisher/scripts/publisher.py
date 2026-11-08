@@ -22,7 +22,7 @@ def type_humanlike(page, text: str):
         elif random.random() < 0.12:
             time.sleep(random.uniform(0.15, 0.45))
 
-def publish_to_dzen(article_data: dict, image_path: Path = None, headless: bool = False) -> bool:
+def publish_to_dzen(article_data: dict, image_path: Path = None, headless: bool = True) -> bool:
     print("=" * 60)
     print("НАЧАЛО ПУБЛИКАЦИИ В ДЗЕН (ИИ-ДИРЕКТОР КАНАЛА)")
     print("=" * 60)
@@ -43,13 +43,11 @@ def publish_to_dzen(article_data: dict, image_path: Path = None, headless: bool 
 
     if not storage_state_path and not config.USER_DATA_DIR.exists():
         print("Ошибка: профиль авторизации не найден!")
-        print("Запустите login.bat или добавьте DZEN_SESSION_STATE в Secrets.")
         return False
 
     with sync_playwright() as p:
         print("Запуск браузера...")
         if storage_state_path:
-            # Запуск в облачном режиме через storage_state
             browser = p.chromium.launch(
                 headless=headless,
                 args=["--no-sandbox", "--disable-blink-features=AutomationControlled"]
@@ -60,7 +58,6 @@ def publish_to_dzen(article_data: dict, image_path: Path = None, headless: bool 
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
             )
         else:
-            # Локальный запуск через persistent context
             context = p.chromium.launch_persistent_context(
                 user_data_dir=str(config.USER_DATA_DIR),
                 headless=headless,
@@ -69,65 +66,44 @@ def publish_to_dzen(article_data: dict, image_path: Path = None, headless: bool 
                 permissions=["clipboard-read", "clipboard-write"]
             )
         
-        page = context.new_page()
+        page = context.pages[0] if context.pages else context.new_page()
         
         try:
-            print("Переход в Дзен-студию...")
-            page.goto("https://dzen.ru/studio", wait_until="domcontentloaded", timeout=60000)
-            time.sleep(random.uniform(4.0, 7.0))
-            
-            print("Дзен-студия загружена. Проверяем сессию...")
-            avatar_selector = '[class*="avatar"], [class*="profile"], header img, .header__avatar'
-            avatar = page.locator(avatar_selector).first
-            
-            try:
-                avatar.wait_for(state="visible", timeout=15000)
-                print("Сессия активна (аватарка профиля найдена).")
-            except Exception:
-                print("Ошибка: аватарка не найдена. Сессия устарела.")
-                context.close()
-                return False
-                
-            print("Переход в редактор статьи...")
-            try:
-                page.goto("https://dzen.ru/profile/editor/create?type=publication", wait_until="domcontentloaded", timeout=25000)
-                time.sleep(random.uniform(4.0, 7.0))
-            except Exception as e:
-                print(f"Прямой переход вернул: {e}")
-                
-            if page.locator('[contenteditable="true"]').count() == 0:
-                print("Пробуем открыть через меню создания...")
-                try:
-                    create_btn = page.locator('button:has-text("Создать"), [class*="create-button"], [data-testid="create-button"]').first
-                    if create_btn.is_visible(timeout=5000):
-                        create_btn.click()
-                        time.sleep(2.0)
-                        art_btn = page.locator('button:has-text("Написать статью"), a:has-text("Написать статью"), div:has-text("Написать статью")').first
-                        if art_btn.is_visible(timeout=5000):
-                            art_btn.click()
-                            time.sleep(5.0)
-                except Exception as menu_err:
-                    print(f"Интерфейсный поиск: {menu_err}")
-            
-            print("Закрытие приветственных окон...")
+            print("1. Переход в Студию Дзена...")
+            page.goto("https://dzen.ru/profile/editor/neuro_hacks_ai", wait_until="domcontentloaded", timeout=60000)
+            time.sleep(random.uniform(3.0, 5.0))
             page.keyboard.press("Escape")
-            time.sleep(random.uniform(1.5, 2.5))
+            time.sleep(1.0)
             
-            print("Ввод заголовка статьи...")
+            print("2. Открываем меню добавления публикации...")
+            add_btn = page.locator('[class*="addButton"]').first
+            add_btn.wait_for(state="visible", timeout=15000)
+            add_btn.click()
+            time.sleep(1.5)
+            
+            print("3. Выбираем 'Написать статью'...")
+            art_btn = page.locator('text="Написать статью"').first
+            art_btn.wait_for(state="visible", timeout=15000)
+            art_btn.click()
+            
+            print("4. Ожидаем загрузку редактора...")
+            page.wait_for_selector('[contenteditable="true"]', timeout=30000)
+            time.sleep(3.0)
+            page.keyboard.press("Escape") # закрываем онбординг подсказку
+            time.sleep(1.0)
+            
+            print("5. Ввод заголовка статьи...")
             title_element = page.locator('[contenteditable="true"]').first
-            title_element.wait_for(state="visible", timeout=15000)
             title_element.click()
-            time.sleep(random.uniform(0.5, 1.2))
-            
+            time.sleep(0.5)
             type_humanlike(page, article_data["title"])
             print(f"Заголовок успешно набран: '{article_data['title']}'")
-            time.sleep(random.uniform(1.5, 3.0))
+            time.sleep(1.5)
             
-            print("Фокусируемся на текстовом поле...")
+            print("6. Фокусируемся на текстовом поле...")
             body_element = page.locator('[contenteditable="true"]').nth(1)
-            body_element.wait_for(state="visible", timeout=15000)
-            body_element.focus()
-            time.sleep(random.uniform(1.0, 2.0))
+            body_element.click()
+            time.sleep(1.0)
             
             paragraphs = [p.strip() for p in article_data["content"].split("\n") if p.strip()]
             print(f"Всего абзацев для набора: {len(paragraphs)}")
@@ -138,105 +114,56 @@ def publish_to_dzen(article_data: dict, image_path: Path = None, headless: bool 
                 if is_heading:
                     print(f"Печать подзаголовка H2: '{paragraph}'...")
                     page.keyboard.press("Control+B")
-                    time.sleep(0.3)
+                    time.sleep(0.2)
                     type_humanlike(page, paragraph)
-                    time.sleep(0.3)
+                    time.sleep(0.2)
                     page.keyboard.press("Control+B")
                 else:
-                    print(f"Человеческий набор абзаца {idx+1}/{len(paragraphs)}...")
                     type_humanlike(page, paragraph)
-                
-                time.sleep(random.uniform(0.8, 1.8))
+                    
                 page.keyboard.press("Enter")
-                time.sleep(random.uniform(0.8, 1.8))
-                
-                if idx == 0 and image_path and image_path.exists():
-                    print("Копирование обложки в буфер обмена для вставки...")
-                    try:
-                        with open(image_path, "rb") as img_file:
-                            base64_data = base64.b64encode(img_file.read()).decode('utf-8')
-                        
-                        js_code = f"""
-                        (async () => {{
-                            try {{
-                                const base64Data = "{base64_data}";
-                                const byteCharacters = atob(base64Data);
-                                const byteNumbers = new Array(byteCharacters.length);
-                                for (let i = 0; i < byteCharacters.length; i++) {{
-                                    byteNumbers[i] = byteCharacters.charCodeAt(i);
-                                }}
-                                const byteArray = new Uint8Array(byteNumbers);
-                                const blob = new Blob([byteArray], {{type: "image/png"}});
-                                
-                                await navigator.clipboard.write([
-                                    new ClipboardItem({{
-                                        [blob.type]: blob
-                                    }})
-                                ]);
-                                return "OK";
-                            }} catch (err) {{
-                                return err.toString();
-                            }}
-                        }})()
-                        """
-                        res = page.evaluate(js_code)
-                        print(f"Результат копирования картинки: {res}")
-                        time.sleep(1.0)
-                        
-                        print("Вставляем обложку через Control+V...")
-                        page.keyboard.press("Control+V")
-                        time.sleep(7.0)
-                        
-                        page.keyboard.press("Enter")
-                        time.sleep(random.uniform(1.0, 2.0))
-                    except Exception as paste_err:
-                        print(f"Не удалось вставить картинку: {paste_err}")
+                time.sleep(random.uniform(0.3, 0.6))
 
             print("Набор текста статьи успешно завершен!")
-            time.sleep(random.uniform(3.0, 6.0))
+            time.sleep(2.0)
             
-            print("Поиск первой кнопки 'Опубликовать'...")
-            publish_btn = page.get_by_text("Опубликовать").first
+            print("7. Поиск кнопки 'Опубликовать'...")
+            publish_btn = page.locator('button:has-text("Опубликовать")').first
             publish_btn.wait_for(state="visible", timeout=15000)
             publish_btn.click()
             print("Нажата первая кнопка публикации...")
-            time.sleep(random.uniform(4.0, 7.0))
+            time.sleep(3.0)
             
             if "tags" in article_data and article_data["tags"]:
                 print(f"Добавление тегов: {article_data['tags']}...")
                 try:
-                    tags_input = page.locator('input[placeholder*="Тег"], input[placeholder*="тег"], input[placeholder*="Тема"], input[placeholder*="тема"]').first
+                    tags_input = page.locator('input[placeholder*="Тег"], input[placeholder*="тег"]').first
                     if tags_input.is_visible(timeout=5000):
                         tags_input.click()
                         time.sleep(0.5)
                         for tag in article_data["tags"]:
                             type_humanlike(page, tag)
-                            time.sleep(random.uniform(0.3, 0.8))
+                            time.sleep(0.4)
                             page.keyboard.press("Enter")
-                            time.sleep(random.uniform(0.5, 1.0))
+                            time.sleep(0.4)
                         print("Теги успешно добавлены.")
                 except Exception as tag_err:
-                    print(f"Не удалось добавить теги: {tag_err}")
+                    print(f"Теги пропущены: {tag_err}")
             
-            print("Нажатие финальной кнопки публикации...")
-            final_publish_btn = page.locator('div[class*="settings"] button:has-text("Опубликовать"), button:has-text("Опубликовать сейчас"), button[type="submit"]:has-text("Опубликовать")').first
-            
-            if not final_publish_btn.is_visible():
-                final_publish_btn = page.locator('button:has-text("Опубликовать"), div[class*="publish"] button').last
-                
+            print("8. Нажатие финальной кнопки публикации...")
+            final_publish_btn = page.locator('button:has-text("Опубликовать")').last
             final_publish_btn.wait_for(state="visible", timeout=15000)
-            time.sleep(random.uniform(1.5, 3.0))
+            time.sleep(1.5)
             final_publish_btn.click()
             print("Финальная кнопка публикации нажата!")
             
-            time.sleep(10)
+            time.sleep(6.0)
             print("Публикация успешно завершена!")
             
             screenshot_path = config.BASE_DIR / "latest_publication.png"
             page.screenshot(path=str(screenshot_path))
             print(f"Скриншот публикации сохранен в: {screenshot_path}")
             
-            # Удаляем временный файл состояния при завершении
             if storage_state_path and storage_state_path.exists():
                 try:
                     storage_state_path.unlink()
@@ -261,11 +188,3 @@ def publish_to_dzen(article_data: dict, image_path: Path = None, headless: bool 
                 pass
             context.close()
             return False
-
-if __name__ == "__main__":
-    test_article = {
-        "title": "Тестовая статья " + str(time.time()),
-        "content": "ВВЕДЕНИЕ В ИИ\nТестовое содержимое.\n\nВТОРОЙ РАЗДЕЛ\nДополнительный текст.",
-        "tags": ["ии", "нейросети"]
-    }
-    publish_to_dzen(test_article, headless=True)
