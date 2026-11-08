@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "google-stitch": {
+      "command": "npx",
+      "args": ["-y", "google-stitch-mcp"],
+      "env": {
+        "STITCH_API_TOKEN": "<YOUR_STITCH_TOKEN>",
+        "GOOGLE_APPLICATION_CREDENTIALS": "d:/Яндекс Диск/YandexDisk/выапорпоапраппаапр/Новая папка/Антигравити и Обсидиан/Antigravity/.agents/google-key.json"
+      }
+    },
+    "autocad": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--with", "pywin32",
+        "--with", "mcp<2",
+        "python",
+        "./autocad-mcp/server.py"
+      ]
+    }
+  }
+}

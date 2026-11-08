@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Установка кнопки синхронизации Антигравити</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #f0f2f5;
+      color: #1c1e21;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .card {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 40px;
+      max-width: 620px;
+      box-shadow: 0 12px 35px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+    h1 {
+      font-size: 26px;
+      margin-bottom: 12px;
+      color: #1877f2;
+    }
+    p {
+      font-size: 16px;
+      line-height: 1.5;
+      color: #606770;
+      margin-bottom: 24px;
+    }
+    .draggable-button {
+      display: inline-block;
+      background: linear-gradient(135deg, #1877f2, #0056b3);
+      color: white !important;
+      text-decoration: none !important;
+      font-size: 18px;
+      font-weight: bold;
+      padding: 16px 32px;
+      border-radius: 50px;
+      box-shadow: 0 6px 18px rgba(24, 119, 242, 0.35);
+      cursor: move;
+      user-select: none;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-bottom: 24px;
+    }
+    .draggable-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 22px rgba(24, 119, 242, 0.45);
+    }
+    .steps {
+      text-align: left;
+      background: #f7f8fa;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-top: 20px;
+    }
+    .steps ol {
+      margin: 0;
+      padding-left: 20px;
+    }
+    .steps li {
+      margin-bottom: 12px;
+      font-size: 15px;
+      color: #333;
+    }
+    .status-badge {
+      display: inline-block;
+      margin-top: 15px;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🚀 Кнопка синхронизации Instagram</h1>
+    <p>Эта кнопка позволяет в один клик извлекать ссылки на уроки, Reels и посты прямо из открытого диалога в Яндекс.Браузере.</p>
+
+    <!-- Перетаскиваемая кнопка -->
+    <a class="draggable-button" href="javascript:(function(){const rows=document.querySelectorAll('div[role=%22row%22],div[dir=%22auto%22]');const links=Array.from(document.querySelectorAll('a[href]')).map(a=>a.href);const collected=[];rows.forEach(r=>{const text=(r.innerText||'').trim();const rowLinks=Array.from(r.querySelectorAll('a[href]')).map(a=>a.href);if(text||rowLinks.length){collected.push({text:text,urls:rowLinks});}});links.forEach(l=>{if(l.includes('/reel/')||l.includes('/p/')){collected.push({text:'(Reel/Post)',urls:[l]});}});const payload={items:collected};function showToast(msg,isErr){const div=document.createElement('div');div.style.cssText='position:fixed;bottom:30px;right:30px;z-index:999999;padding:16px 24px;border-radius:12px;background:'+(isErr?'%23e74c3c':'%232ecc71')+';color:%23fff;font-family:sans-serif;font-size:15px;box-shadow:0 10px 25px rgba(0,0,0,0.3);';div.innerText=msg;document.body.appendChild(div);setTimeout(()=>{div.remove();},3500);}fetch('http://127.0.0.1:54321/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(r=>r.json()).then(res=>{showToast('✅ Антигравити: '+res.message,false);}).catch(err=>{const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='instagram_materials.json';a.click();showToast('⚠️ Сохранен файл instagram_materials.json в Загрузки!',true);});})();">
+      📥 В Антигравити (Перетащи меня)
+    </a>
+
+    <div class="steps">
+      <strong>📋 Как установить:</strong>
+      <ol>
+        <li>Если в браузере не видна панель закладок под адресной строкой, нажмите <b>Ctrl + Shift + B</b> (или <b>Ctrl + Shift + O</b>).</li>
+        <li>Зажмите мышкой синюю кнопку <b>«📥 В Антигравити»</b> выше и <b>перетащите её на панель закладок</b> браузера.</li>
+        <li>Готово! Теперь в любой момент, когда вы открыли диалог в Instagram:
+          <br>➡️ Просто <b>кликните на эту закладку</b> на панели закладок.
+        </li>
+      </ol>
+    </div>
+
+    <div style="margin-top: 20px;">
+      <button onclick="checkServer()" style="padding: 10px 18px; border-radius: 8px; border: 1px solid #ccc; cursor: pointer; background: #fff;">
+        Проверить связь с сервером Антигравити
+      </button>
+      <div id="status" style="margin-top: 10px; font-weight: bold;"></div>
+    </div>
+  </div>
+
+  <script>
+    function checkServer() {
+      const statusEl = document.getElementById('status');
+      statusEl.innerText = 'Проверка...';
+      fetch('http://127.0.0.1:54321/')
+        .then(r => r.json())
+        .then(data => {
+          statusEl.style.color = '#2ecc71';
+          statusEl.innerText = '✅ Сервер Антигравити активен и готов принимать данные!';
+        })
+        .catch(err => {
+          statusEl.style.color = '#e67e22';
+          statusEl.innerText = 'ℹ️ Сервер пока не запущен (файл 3_start_receiver.bat). Но при клике на закладку данные сохранятся в файл Загрузок!';
+        });
+    }
+  </script>
+</body>
+</html>

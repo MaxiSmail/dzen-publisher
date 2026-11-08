@@ -1,0 +1,5 @@
+(defun c:test_ping ()
+  (princ "\n--- PING FROM AUTOLISP SUCCESSFUL! ---\n")
+  (princ)
+)
+(c:test_ping)

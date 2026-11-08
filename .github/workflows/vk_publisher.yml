@@ -45,7 +45,7 @@ jobs:
           VK_ACCESS_TOKEN: ${{ secrets.VK_ACCESS_TOKEN }}
           VK_GROUP_ID: ${{ secrets.VK_GROUP_ID }}
         run: |
-          cd "Проект Автопостинг VK/scripts"
+          cd "Программирование/Проект Автопостинг VK/scripts"
           python main.py --mode own_rss
 
       - name: Run VK Publisher (Scheduled Afternoon - 13:50 MSK)
@@ -55,7 +55,7 @@ jobs:
           VK_ACCESS_TOKEN: ${{ secrets.VK_ACCESS_TOKEN }}
           VK_GROUP_ID: ${{ secrets.VK_GROUP_ID }}
         run: |
-          cd "Проект Автопостинг VK/scripts"
+          cd "Программирование/Проект Автопостинг VK/scripts"
           python main.py --mode dzen_adaptation
 
       - name: Run VK Publisher (Manual Run)
@@ -65,11 +65,11 @@ jobs:
           VK_ACCESS_TOKEN: ${{ secrets.VK_ACCESS_TOKEN }}
           VK_GROUP_ID: ${{ secrets.VK_GROUP_ID }}
         run: |
-          cd "Проект Автопостинг VK/scripts"
+          cd "Программирование/Проект Автопостинг VK/scripts"
           python main.py --mode ${{ github.event.inputs.mode }}
 
       - name: Commit updated history
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "chore: update vk posted history [skip ci]"
-          file_pattern: "Проект Автопостинг VK/scripts/posted_history.json"
+          file_pattern: "Программирование/Проект Автопостинг VK/scripts/posted_history.json"

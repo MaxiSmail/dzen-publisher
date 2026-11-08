@@ -1,0 +1,9 @@
+[project]
+name = "autocad-mcp"
+version = "1.0.0"
+description = "AutoCAD Automation MCP Server for Antigravity"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp<2",
+    "pywin32>=306",
+]

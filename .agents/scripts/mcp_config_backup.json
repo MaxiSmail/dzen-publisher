@@ -1,0 +1,35 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp"
+      ]
+    },
+    "firecrawl": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "firecrawl-mcp"
+      ],
+      "env": {
+        "FIRECRAWL_API_KEY": "fc-95969728b53e46dd91deb8c8ebca5013"
+      }
+    },
+    "chrome-puppeteer": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-puppeteer"
+      ]
+    },
+    "markdown-processing": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "md-mcp"
+      ]
+    }
+  }
+}

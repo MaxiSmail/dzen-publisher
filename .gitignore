@@ -1,24 +1,64 @@
-# Logs
+# Logs & Debug
 logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Dependencies & Environments
+node_modules/
+jspm_packages/
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
 
-# Editor directories and files
+# Caches & Browser Profiles
+.cache/
+.pytest_cache/
+.mypy_cache/
+.chrome_profile/
+browser_data/
+.gradle/
+kspCaches/
+graphify-out/
+build/
+dist/
+dist-ssr/
+out/
+.next/
+.nuxt/
+
+# Environment Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*key*.json
+*service_account*.json
+google-key.json
+
+# Independent Git sub-repositories
+Программирование/Проект HTML балконные ограждения/
+Программирование/Проект Telegram-Облако/
+Программирование/Проект Арбат приложение/
+Программирование/Проект Арбат сайт/
+Программирование/Проект БМК сайт/
+
+# IDEs & System files
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+*secret*.txt
+
