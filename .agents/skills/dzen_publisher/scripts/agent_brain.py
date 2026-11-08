@@ -1,8 +1,17 @@
+import sys
 import json
 import random
+import time
 from pathlib import Path
+
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
+
 from google import genai
 from google.genai import types
+from google.genai.errors import APIError
 from pydantic import BaseModel
 from typing import List
 import config
@@ -51,14 +60,12 @@ def generate_article(analytics_data: dict = None) -> dict:
     
     print(f"Запуск генерации адаптивного ИИ-материала по теме: {base_category}...")
     
-    from google.genai.errors import APIError
-    import time
-    
     max_attempts = 5
+    response = None
     for attempt in range(max_attempts):
         try:
             response = client.models.generate_content(
-                model='gemini-3.1-flash-lite',
+                model='gemini-2.5-flash',
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=config.SYSTEM_INSTRUCTION,
@@ -79,19 +86,19 @@ def generate_article(analytics_data: dict = None) -> dict:
     
     try:
         article_data = json.loads(response.text)
+        # Принудительная защита контекста 2026 года
+        for key in ["title", "content"]:
+            if key in article_data and isinstance(article_data[key], str):
+                article_data[key] = article_data[key].replace("2024", "2026").replace("2025", "2026")
         print("Адаптивная ИИ-статья успешно сгенерирована!")
         print(f"Заголовок: {article_data.get('title')}")
         print(f"Теги: {article_data.get('tags')}")
         return article_data
     except Exception as e:
         print(f"Ошибка парсинга ответа от Gemini: {e}")
-        print("Сырой ответ модели:")
-        print(response.text)
         raise e
 
 if __name__ == "__main__":
-    import dotenv
-    dotenv.load_dotenv()
     try:
         article = generate_article()
         print(json.dumps(article, indent=2, ensure_ascii=False))
