@@ -3,9 +3,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Загрузка переменных из .env
+# load
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / '.env')
 load_dotenv()
 
-BASE_DIR = Path(__file__).resolve().parent
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -59,4 +61,3 @@ SYSTEM_INSTRUCTION = """Ты — Главный инженер промптов 
   "tags": ["промпты", "скиллы", "нейросети"]
 }
 """
-

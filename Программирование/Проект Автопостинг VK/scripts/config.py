@@ -3,9 +3,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Загрузка переменных из .env
+# load
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / '.env')
 load_dotenv()
 
-BASE_DIR = Path(__file__).resolve().parent
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 VK_ACCESS_TOKEN = os.getenv("VK_ACCESS_TOKEN")
@@ -59,5 +61,4 @@ SYSTEM_INSTRUCTION_VK = """Ты — ведущий СММ-директор и р
   "tags": ["нейросети", "технологии", "промпты"]
 }
 """
-
 
