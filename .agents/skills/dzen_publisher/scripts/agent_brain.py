@@ -65,7 +65,7 @@ def generate_article(analytics_data: dict = None) -> dict:
     for attempt in range(max_attempts):
         try:
             response = client.models.generate_content(
-                model='gemini-2.5-flash',
+                model='gemini-3.1-flash-lite',
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=config.SYSTEM_INSTRUCTION,
