@@ -105,6 +105,27 @@ def publish_to_dzen(article_data: dict, image_path: Path = None, headless: bool 
             body_element.click()
             time.sleep(1.0)
             
+            # Вставка обложки статьи через нативный файловый загрузчик Дзена
+            if image_path and Path(image_path).exists():
+                print(f"Загрузка обложки статьи: {image_path}...")
+                try:
+                    side_btn = page.locator('[class*="side-button__sideButton"]').first
+                    if side_btn.is_visible(timeout=5000):
+                        side_btn.click()
+                        time.sleep(1.0)
+                        file_btn = page.locator('[class*="image-popup__fileButton"]').first
+                        with page.expect_file_chooser(timeout=8000) as fc_info:
+                            file_btn.click()
+                        fc = fc_info.value
+                        fc.set_files(str(Path(image_path).resolve()))
+                        print("Обложка передана в загрузчик Дзена. Ожидание завершения отгрузки на сервер...")
+                        time.sleep(6.0)
+                        print("Обложка успешно встроена в статью!")
+                        page.keyboard.press("Enter")
+                        time.sleep(1.0)
+                except Exception as img_err:
+                    print(f"Предупреждение: Ошибка вставки обложки: {img_err}")
+            
             paragraphs = [p.strip() for p in article_data["content"].split("\n") if p.strip()]
             print(f"Всего абзацев для набора: {len(paragraphs)}")
             
