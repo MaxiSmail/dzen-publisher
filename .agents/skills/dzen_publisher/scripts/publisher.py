@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from playwright.sync_api import sync_playwright, TimeoutError
 import config
+import telegram_notifier
 
 def type_humanlike(page, text: str):
     """
@@ -74,6 +75,19 @@ def publish_to_dzen(article_data: dict, image_path: Path = None, headless: bool 
             time.sleep(random.uniform(3.0, 5.0))
             page.keyboard.press("Escape")
             time.sleep(1.0)
+            
+            # Проверка слетевшей авторизации (редирект на паспорт или форму логина)
+            current_url = page.url
+            if "passport.yandex" in current_url or "dzen.ru/auth" in current_url:
+                print(f"❌ КРИТИЧЕСКАЯ ОШИБКА: Авторизация Дзена истекла! Текущий URL: {current_url}")
+                err_screenshot = config.BASE_DIR / "error_screenshot.png"
+                page.screenshot(path=str(err_screenshot))
+                telegram_notifier.send_error_notification(
+                    "Сессия Яндекс.Дзена истекла (редирект на страницу входа). Запустите login.bat для обновления профиля!",
+                    screenshot_path=err_screenshot
+                )
+                context.close()
+                return False
             
             print("2. Открываем меню добавления публикации...")
             add_btn = page.locator('[class*="addButton"]').first
@@ -197,7 +211,14 @@ def publish_to_dzen(article_data: dict, image_path: Path = None, headless: bool 
         except TimeoutError as te:
             print(f"Превышено время ожидания элементов интерфейса: {te}")
             err_screenshot = config.BASE_DIR / "error_screenshot.png"
-            page.screenshot(path=str(err_screenshot))
+            try:
+                page.screenshot(path=str(err_screenshot))
+                telegram_notifier.send_error_notification(
+                    f"Таймаут элементов интерфейса Дзен: {te}",
+                    screenshot_path=err_screenshot
+                )
+            except:
+                pass
             context.close()
             return False
         except Exception as e:
@@ -205,6 +226,10 @@ def publish_to_dzen(article_data: dict, image_path: Path = None, headless: bool 
             err_screenshot = config.BASE_DIR / "error_screenshot.png"
             try:
                 page.screenshot(path=str(err_screenshot))
+                telegram_notifier.send_error_notification(
+                    f"Критическая ошибка публикации: {e}",
+                    screenshot_path=err_screenshot
+                )
             except:
                 pass
             context.close()

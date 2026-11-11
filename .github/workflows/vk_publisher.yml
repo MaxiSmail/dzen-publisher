@@ -9,13 +9,14 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Режим запуска: own_rss или dzen_adaptation'
+        description: 'Режим запуска: own_rss, dzen_adaptation или auto'
         required: true
         type: choice
         options:
+          - auto
           - own_rss
           - dzen_adaptation
-        default: own_rss
+        default: auto
 
 jobs:
   publish:
@@ -38,38 +39,30 @@ jobs:
           python -m pip install --upgrade pip
           pip install feedparser beautifulsoup4 requests google-genai pydantic python-dotenv
 
-      - name: Run VK Publisher (Scheduled Morning - 09:00 MSK)
-        if: github.event_name == 'schedule' && github.event.schedule == '0 6 * * *'
+      - name: Run VK Publisher
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           VK_ACCESS_TOKEN: ${{ secrets.VK_ACCESS_TOKEN }}
           VK_GROUP_ID: ${{ secrets.VK_GROUP_ID }}
+          INPUT_MODE: ${{ github.event.inputs.mode }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           cd "Программирование/Проект Автопостинг VK/scripts"
-          python main.py --mode own_rss
-
-      - name: Run VK Publisher (Scheduled Afternoon - 13:50 MSK)
-        if: github.event_name == 'schedule' && github.event.schedule == '50 10 * * *'
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          VK_ACCESS_TOKEN: ${{ secrets.VK_ACCESS_TOKEN }}
-          VK_GROUP_ID: ${{ secrets.VK_GROUP_ID }}
-        run: |
-          cd "Программирование/Проект Автопостинг VK/scripts"
-          python main.py --mode dzen_adaptation
-
-      - name: Run VK Publisher (Manual Run)
-        if: github.event_name == 'workflow_dispatch'
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          VK_ACCESS_TOKEN: ${{ secrets.VK_ACCESS_TOKEN }}
-          VK_GROUP_ID: ${{ secrets.VK_GROUP_ID }}
-        run: |
-          cd "Программирование/Проект Автопостинг VK/scripts"
-          python main.py --mode ${{ github.event.inputs.mode }}
+          MODE="$INPUT_MODE"
+          if [ -z "$MODE" ] || [ "$MODE" = "auto" ]; then
+            CURRENT_HOUR=$(date -u +%H)
+            if [ "$CURRENT_HOUR" -lt 10 ]; then
+              MODE="own_rss"
+            else
+              MODE="dzen_adaptation"
+            fi
+          fi
+          echo "Режим запуска VK: $MODE"
+          python main.py --mode "$MODE"
 
       - name: Commit updated history
         uses: stefanzweifel/git-auto-commit-action@v5
+        continue-on-error: true
         with:
           commit_message: "chore: update vk posted history [skip ci]"
           file_pattern: "Программирование/Проект Автопостинг VK/scripts/posted_history.json"

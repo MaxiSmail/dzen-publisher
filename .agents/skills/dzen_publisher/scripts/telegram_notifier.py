@@ -62,6 +62,42 @@ def send_telegram_notification(title: str, tags: list, screenshot_path: Path = N
         print(f"Не удалось отправить уведомление в Telegram: {e}")
         return False
 
+def send_error_notification(error_message: str, screenshot_path: Path = None) -> bool:
+    """
+    Отправляет экстренное уведомление об ошибке публикации автору.
+    """
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return False
+
+    caption = (
+        f"⚠️ <b>[ИИ-Директор Дзена] Ошибка публикации!</b>\n\n"
+        f"❌ <b>Причина:</b> {error_message}\n\n"
+        f"🛠 <i>Проверьте авторизацию или логи запуска.</i>"
+    )
+
+    try:
+        if screenshot_path and Path(screenshot_path).exists():
+            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto"
+            with open(screenshot_path, "rb") as photo_file:
+                payload = {
+                    "chat_id": TELEGRAM_CHAT_ID,
+                    "caption": caption[:1024],
+                    "parse_mode": "HTML"
+                }
+                files = {"photo": photo_file}
+                res = requests.post(url, data=payload, files=files, timeout=20)
+        else:
+            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+            payload = {
+                "chat_id": TELEGRAM_CHAT_ID,
+                "text": caption,
+                "parse_mode": "HTML"
+            }
+            res = requests.post(url, json=payload, timeout=20)
+        return res.status_code == 200
+    except Exception as e:
+        print(f"Ошибка отправки алерта: {e}")
+        return False
+
 if __name__ == "__main__":
-    # Тест отсылки
     send_telegram_notification("Тестовый заголовок ИИ", ["ии", "нейросети"])

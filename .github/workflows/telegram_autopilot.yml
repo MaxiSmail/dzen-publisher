@@ -39,6 +39,7 @@ jobs:
 
       - name: Commit updated history
         uses: stefanzweifel/git-auto-commit-action@v5
+        continue-on-error: true
         with:
           commit_message: "chore: update telegram posted history [skip ci]"
           file_pattern: "Программирование/Проект Автопостинг Telegram/scripts/posted_history.json"
