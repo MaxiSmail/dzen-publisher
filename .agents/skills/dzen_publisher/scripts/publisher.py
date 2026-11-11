@@ -28,12 +28,18 @@ def publish_to_dzen(article_data: dict, image_path: Path = None, headless: bool 
     print("НАЧАЛО ПУБЛИКАЦИИ В ДЗЕН (ИИ-ДИРЕКТОР КАНАЛА)")
     print("=" * 60)
     
-    # Поддержка гибридного режима авторизации (Локальный профиль или GitHub Secrets)
+    # Поддержка гибридного режима авторизации (Локальный профиль, env или локальный github_session_secret.txt)
     session_secret_b64 = os.environ.get("DZEN_SESSION_STATE")
+    if not session_secret_b64:
+        local_secret_file = config.BASE_DIR / "github_session_secret.txt"
+        if local_secret_file.exists():
+            print("Обнаружен локальный файл сессии github_session_secret.txt (Multi-PC Fallback)!")
+            session_secret_b64 = local_secret_file.read_text(encoding="utf-8").strip()
+
     storage_state_path = None
     
     if session_secret_b64:
-        print("Обнаружен облачный секрет авторизации DZEN_SESSION_STATE (GitHub Actions Mode)!")
+        print("Обнаружен секрет авторизации DZEN_SESSION_STATE!")
         try:
             decoded_json = base64.b64decode(session_secret_b64.encode('utf-8')).decode('utf-8')
             storage_state_path = config.BASE_DIR / "temp_storage_state.json"

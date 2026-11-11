@@ -15,6 +15,12 @@ def collect_analytics() -> dict:
     print("=" * 60)
     
     session_secret_b64 = os.environ.get("DZEN_SESSION_STATE")
+    if not session_secret_b64:
+        local_secret_file = config.BASE_DIR / "github_session_secret.txt"
+        if local_secret_file.exists():
+            print("Обнаружен локальный файл сессии github_session_secret.txt (Multi-PC Fallback)!")
+            session_secret_b64 = local_secret_file.read_text(encoding="utf-8").strip()
+
     storage_state_path = None
     
     if session_secret_b64:
