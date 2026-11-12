@@ -11,6 +11,8 @@ VK_ACCESS_TOKEN = os.getenv("VK_ACCESS_TOKEN")
 VK_USER_TOKEN = os.getenv("VK_USER_TOKEN")
 VK_GROUP_ID = os.getenv("VK_GROUP_ID")
 HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_TOKEN")
+CF_ACCOUNT_ID = os.getenv("CF_ACCOUNT_ID") or os.getenv("CLOUDFLARE_ACCOUNT_ID")
+CF_API_TOKEN = os.getenv("CF_API_TOKEN") or os.getenv("CLOUDFLARE_API_TOKEN")
 
 DZEN_CHANNEL_RSS = "https://dzen.ru/rss/id/623c51ed88b1104ddc4eb738"
 
