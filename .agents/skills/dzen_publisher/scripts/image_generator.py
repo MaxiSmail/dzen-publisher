@@ -2,17 +2,23 @@ import urllib.parse
 import requests
 import random
 import time
+import sys
 from pathlib import Path
 import config
 
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
+
 def generate_and_download_image(prompt: str, filename_prefix: str = "cover") -> Path:
     """
-    Генератор фотореалистичных обложек для Дзена в журнальном стиле (FLUX).
+    Генератор фотореалистичных обложек для Дзена в журнальном стиле (FLUX / SANA).
     Исключает дешевый пластиковый ИИ-стиль (неон, роботы, 3D-рендеры).
     """
-    print(f"Генерация редакционной обложки (FLUX): '{prompt[:70]}...'")
+    print(f"Генерация редакционной обложки (FLUX/SANA): '{prompt[:70]}...'")
     
-    # Добавляем модификаторы кинематографичной фотографии и жесткие негативные фильтры
+    # Модификаторы естественной фотографии и анти-ИИ фильтры
     enhanced_prompt = (
         f"{prompt}. Shot on 35mm film, Leica M11 photography, 50mm f/1.4 lens, "
         f"natural soft daylight, authentic textures, documentary aesthetic, rich colors. "
@@ -28,16 +34,17 @@ def generate_and_download_image(prompt: str, filename_prefix: str = "cover") -> 
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     }
 
-    # Каскад фотореалистичных движков на базе FLUX (без пластикового турбо-мыла)
+    # Каскад фотореалистичных моделей (FLUX -> SANA)
     engines = [
         ("Pollinations FLUX", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1200&height=675&model=flux&nologo=true&seed={seed}"),
-        ("Pollinations FLUX-Realism", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1200&height=675&model=flux-realism&nologo=true&seed={seed}")
+        ("Pollinations SANA", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&model=sana&nologo=true&seed={seed}"),
+        ("Pollinations FLUX-Realism", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&model=flux-realism&nologo=true&seed={seed}")
     ]
     
     for engine_name, url in engines:
         try:
             print(f"Попытка генерации через {engine_name}...")
-            response = requests.get(url, headers=headers, timeout=45)
+            response = requests.get(url, headers=headers, timeout=40)
             if response.status_code == 200 and len(response.content) > 10000:
                 with open(output_path, "wb") as f:
                     f.write(response.content)
@@ -49,17 +56,21 @@ def generate_and_download_image(prompt: str, filename_prefix: str = "cover") -> 
             print(f"⚠️ Ошибка {engine_name}: {e}")
         time.sleep(1)
         
-    # Резервный источник: если движки перегружены, берем качественное фото из проверенного источника
+    # Резервный фотобанк
     print("⚠️ Генераторы перегружены. Загрузка из фотобанка...")
-    fallback_url = "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&h=675&q=80"
-    try:
-        res = requests.get(fallback_url, headers=headers, timeout=20)
-        if res.status_code == 200:
-            with open(output_path, "wb") as f:
-                f.write(res.content)
-            return output_path
-    except Exception as e:
-        print(f"Ошибка загрузки фотобанка: {e}")
+    fallback_urls = [
+        "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&h=675&q=80",
+        "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&h=675&q=80"
+    ]
+    for fb in fallback_urls:
+        try:
+            res = requests.get(fb, headers=headers, timeout=20)
+            if res.status_code == 200 and len(res.content) > 10000:
+                with open(output_path, "wb") as f:
+                    f.write(res.content)
+                return output_path
+        except Exception:
+            pass
         
     raise RuntimeError("Не удалось сгенерировать качественную обложку")
 

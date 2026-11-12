@@ -13,10 +13,10 @@ if hasattr(sys.stderr, 'reconfigure'):
 
 def generate_image(prompt: str, topic_keyword: str = "technology") -> tuple:
     """
-    Генератор фотореалистичных обложек для VK в редакционном стиле (FLUX).
+    Генератор фотореалистичных обложек для VK в редакционном стиле (FLUX / SANA).
     Исключает дешевый пластиковый ИИ-стиль (неон, роботы, 3D-рендеры).
     """
-    print(f"Каскадная генерация редакционной обложки (FLUX): '{prompt[:60]}...'")
+    print(f"Каскадная генерация редакционной обложки (FLUX/SANA): '{prompt[:60]}...'")
     
     enhanced_prompt = (
         f"{prompt}. Shot on 35mm film, Leica M11, natural daylight, "
@@ -35,7 +35,8 @@ def generate_image(prompt: str, topic_keyword: str = "technology") -> tuple:
 
     ai_engines = [
         ("Pollinations FLUX", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1200&height=675&model=flux&nologo=true&seed={seed}"),
-        ("Pollinations FLUX-Realism", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1200&height=675&model=flux-realism&nologo=true&seed={seed}")
+        ("Pollinations SANA", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&model=sana&nologo=true&seed={seed}"),
+        ("Pollinations FLUX-Realism", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&model=flux-realism&nologo=true&seed={seed}")
     ]
     
     for engine_name, url in ai_engines:

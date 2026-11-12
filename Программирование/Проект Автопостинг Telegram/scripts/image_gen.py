@@ -13,12 +13,11 @@ if hasattr(sys.stderr, 'reconfigure'):
 
 def generate_image(prompt: str, topic_keyword: str = "technology") -> tuple:
     """
-    Генератор фотореалистичных обложек для Telegram в редакционном стиле (FLUX).
+    Генератор фотореалистичных обложек для Telegram в редакционном стиле (FLUX / SANA).
     Исключает дешевый пластиковый ИИ-стиль (неон, роботы, 3D-рендеры).
     """
-    print(f"Каскадная генерация редакционной обложки (FLUX): '{prompt[:60]}...'")
+    print(f"Каскадная генерация редакционной обложки (FLUX/SANA): '{prompt[:60]}...'")
     
-    # Модификаторы естественной фотографии и анти-ИИ фильтры
     enhanced_prompt = (
         f"{prompt}. Shot on 35mm film, Leica M11, 50mm f/1.4 lens, natural daylight, "
         f"subtle grain, authentic atmosphere, editorial photography. "
@@ -34,10 +33,10 @@ def generate_image(prompt: str, topic_keyword: str = "technology") -> tuple:
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     }
 
-    # Только фотореалистичные модели FLUX (без аниме и турбо-мыла)
     ai_engines = [
         ("Pollinations FLUX", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1200&height=675&model=flux&nologo=true&seed={seed}"),
-        ("Pollinations FLUX-Realism", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1200&height=675&model=flux-realism&nologo=true&seed={seed}")
+        ("Pollinations SANA", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&model=sana&nologo=true&seed={seed}"),
+        ("Pollinations FLUX-Realism", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&model=flux-realism&nologo=true&seed={seed}")
     ]
     
     for engine_name, url in ai_engines:
