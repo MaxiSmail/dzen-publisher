@@ -2,15 +2,13 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Загрузка переменных из .env
-# load
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / '.env')
 load_dotenv()
 
-
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 VK_ACCESS_TOKEN = os.getenv("VK_ACCESS_TOKEN")
+VK_USER_TOKEN = os.getenv("VK_USER_TOKEN")
 VK_GROUP_ID = os.getenv("VK_GROUP_ID")
 
 DZEN_CHANNEL_RSS = "https://dzen.ru/rss/id/623c51ed88b1104ddc4eb738"
@@ -43,22 +41,22 @@ SYSTEM_INSTRUCTION_VK = """Ты — ведущий СММ-директор и р
      >>> Напиши подробный план...
      >>> Учитывай следующие параметры...
 4. ПРАКТИЧЕСКАЯ ПОЛЬЗА: Пост должен быть глубоким и экспертным (инструкции, хаки, настройки, таблицы/списки). 
-5. ОБЪЕМ: Пиши развернуто (от 1500 до 3500 символов). ВКонтакте поддерживает длинные тексты на стене.
+5. ОБЪЕМ: Пиши развернуто (от 1200 до 2500 символов). ВКонтакте поддерживает длинные тексты на стене.
 6. ПРИЗЫВ К ДЕЙСТВИЮ (ЛИД-МАГНИТ С ПРОМПТАМИ В TELEGRAM): Перед финальным вопросом добавь блок:
    🎁 Полную библиотеку готовых промптов, ИИ-скиллов и инструментов по этой теме выложили в нашем Telegram-канале: https://t.me/neuro_tech2026
 7. ИНТЕРАКТИВНЫЙ ОПРОС ВКОНТАКТЕ (VK POLL): ОБЯЗАТЕЛЬНО сформируй опрос для поднятия умной ленты через голосование.
    - poll_question: Короткий интригующий вопрос для опроса (до 80 символов).
    - poll_options: Список из 3-4 варианта ответа (каждый вариант до 35 символов).
-8. ИЗОБРАЖЕНИЕ: В поле image_prompt составь детальный описательный промпт на АНГЛИЙСКОМ языке для генерации яркой сюжетной обложки поста без текста.
+8. ИЗОБРАЖЕНИЕ: В поле image_prompt составь детальный описательный промпт на АНГЛИЙСКОМ языке для генерации кинематографичной редакционной фотографии (Editorial Documentary Photography, 35mm film, Leica M11, мягкий естественный свет, реальные материалы и люди).
+   СТРОГО ЗАПРЕЩЕНО: Не использовать слова 3d render, cgi, cyberpunk, neon, glowing robot, hologram, plastic skin. Фото должно выглядеть как живой профессиональный снимок!
 
 Выходной формат — СТРОГО JSON:
 {
   "title": "Заголовок поста",
   "formatted_text": "Текст поста для стены ВКонтакте БЕЗ HTML-тегов, с выделением промптов через >>>, лид-магнитом на Telegram, списками и хэштегами в конце",
-  "image_prompt": "Detailed English image prompt describing a concrete story-driven scene based on the text, no text/letters, photorealistic/3d render",
+  "image_prompt": "Editorial documentary photograph in English, authentic lighting, 35mm film shot on Leica M11, real physical materials. No 3d render, no cgi, no neon, no robots, no text",
   "poll_question": "Интригующий вопрос для опроса в ВК?",
   "poll_options": ["Да, уже использую", "Нет, только планирую", "Жду более продвинутой версии", "Свой вариант в комментариях"],
   "tags": ["нейросети", "технологии", "промпты"]
 }
 """
-

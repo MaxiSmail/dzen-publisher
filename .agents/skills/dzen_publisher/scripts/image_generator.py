@@ -1,44 +1,72 @@
 import urllib.parse
 import requests
 import random
+import time
 from pathlib import Path
 import config
 
 def generate_and_download_image(prompt: str, filename_prefix: str = "cover") -> Path:
-    print(f"Генерация обложки для промпта: '{prompt}'...")
+    """
+    Генератор фотореалистичных обложек для Дзена в журнальном стиле (FLUX).
+    Исключает дешевый пластиковый ИИ-стиль (неон, роботы, 3D-рендеры).
+    """
+    print(f"Генерация редакционной обложки (FLUX): '{prompt[:70]}...'")
     
-    # URL-кодируем промпт
-    encoded_prompt = urllib.parse.quote(prompt)
+    # Добавляем модификаторы кинематографичной фотографии и жесткие негативные фильтры
+    enhanced_prompt = (
+        f"{prompt}. Shot on 35mm film, Leica M11 photography, 50mm f/1.4 lens, "
+        f"natural soft daylight, authentic textures, documentary aesthetic, rich colors. "
+        f"Avoid: 3d render, cgi, cartoon, neon glow, blue holograms, glowing circuits, "
+        f"robot faces, cyberpunk, plastic skin, distorted hands, text, typography, watermark"
+    )
     
-    # Генерируем случайный seed для разнообразия картинок
+    encoded_prompt = urllib.parse.quote(enhanced_prompt)
     seed = random.randint(1, 1000000)
-    
-    # Используем Pollinations.ai (бесплатный стабильный генератор картинок Flux)
-    # nologo=true убирает ватермарку, seed дает разнообразие
-    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&nologo=true&seed={seed}"
-    
     output_path = config.IMAGE_DIR / f"{filename_prefix}_{seed}.jpg"
     
-    try:
-        response = requests.get(image_url, timeout=45)
-        response.raise_for_status()
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+
+    # Каскад фотореалистичных движков на базе FLUX (без пластикового турбо-мыла)
+    engines = [
+        ("Pollinations FLUX", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1200&height=675&model=flux&nologo=true&seed={seed}"),
+        ("Pollinations FLUX-Realism", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1200&height=675&model=flux-realism&nologo=true&seed={seed}")
+    ]
+    
+    for engine_name, url in engines:
+        try:
+            print(f"Попытка генерации через {engine_name}...")
+            response = requests.get(url, headers=headers, timeout=45)
+            if response.status_code == 200 and len(response.content) > 10000:
+                with open(output_path, "wb") as f:
+                    f.write(response.content)
+                print(f"✅ Премиальная обложка успешно сгенерирована ({len(response.content)} байт): {output_path}")
+                return output_path
+            else:
+                print(f"⚠️ {engine_name} вернул статус: {response.status_code}")
+        except Exception as e:
+            print(f"⚠️ Ошибка {engine_name}: {e}")
+        time.sleep(1)
         
-        # Сохраняем картинку
-        with open(output_path, "wb") as f:
-            f.write(response.content)
-            
-        print(f"Обложка успешно сгенерирована и сохранена в: {output_path}")
-        return output_path
+    # Резервный источник: если движки перегружены, берем качественное фото из проверенного источника
+    print("⚠️ Генераторы перегружены. Загрузка из фотобанка...")
+    fallback_url = "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&h=675&q=80"
+    try:
+        res = requests.get(fallback_url, headers=headers, timeout=20)
+        if res.status_code == 200:
+            with open(output_path, "wb") as f:
+                f.write(res.content)
+            return output_path
     except Exception as e:
-        print(f"Ошибка при генерации или скачивании изображения: {e}")
-        # Если генерация не сработала, вернем None или сгенерируем дефолтную ошибку
-        raise e
+        print(f"Ошибка загрузки фотобанка: {e}")
+        
+    raise RuntimeError("Не удалось сгенерировать качественную обложку")
 
 if __name__ == "__main__":
-    # Тестовый запуск
-    test_prompt = "A high-quality 3D render of a futuristic quantum computer glowing in the dark, science fiction style, highly detailed"
+    test_prompt = "Close-up of modern minimalist designer desk with laptop, notebook and cup of coffee in morning sun"
     try:
-        path = generate_and_download_image(test_prompt, "test")
-        print(f"Тест пройден. Картинка сохранена: {path.exists()}")
+        p = generate_and_download_image(test_prompt, "test")
+        print("Тест пройден:", p.exists())
     except Exception as e:
-        print(f"Тест провален: {e}")
+        print("Ошибка:", e)

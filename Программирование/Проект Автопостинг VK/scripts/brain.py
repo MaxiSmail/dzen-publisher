@@ -22,7 +22,6 @@ class VKPost(BaseModel):
     poll_question: Optional[str] = None
     poll_options: Optional[List[str]] = None
 
-
 def get_gemini_client():
     if not config.GEMINI_API_KEY:
         raise ValueError("GEMINI_API_KEY не задан в .env!")
@@ -34,6 +33,7 @@ def generate_post_from_rss(article_data: dict) -> dict:
     
     raw_title = article_data.get("title", "")
     raw_content = article_data.get("content", "")
+    link = article_data.get("link", "")
     
     prompt = f"""
     На основе следующей новости создай глубокий практический пост для ВК.
@@ -46,10 +46,15 @@ def generate_post_from_rss(article_data: dict) -> dict:
     1. Перепиши новость, объяснив её практическую важность.
     2. Обязательно добавь практическую ценность: готовый промпт (выделив его строками с >>>) и пошаговую мини-инструкцию по применению описанной технологии.
     3. Пост не должен содержать HTML тегов!
+    4. Создай подробный английский промпт (image_prompt) для кинематографичной редакционной фотографии (Editorial Documentary Photography, Leica M11, 35mm film, мягкий естественный свет, реальные материалы и люди).
+       СТРОГО ЗАПРЕЩЕНО: Не использовать слова 3d render, cgi, cyberpunk, neon, glowing robot, hologram, plastic skin.
     """
     
     print(f"Запрос к Gemini API для генерации VK-поста из RSS: '{raw_title}'...")
-    return _generate_with_gemini(client, prompt)
+    res = _generate_with_gemini(client, prompt)
+    if link and link not in res.get("formatted_text", ""):
+        res["formatted_text"] += f"\n\n🔗 Первоисточник: {link}"
+    return res
 
 def adapt_dzen_article_to_vk(dzen_title: str, dzen_content: str) -> dict:
     """Адаптация длинной статьи из Дзена под формат ВКонтакте (очистка от HTML, форматирование промптов)."""
@@ -66,7 +71,7 @@ def adapt_dzen_article_to_vk(dzen_title: str, dzen_content: str) -> dict:
     1. Очисти текст от всех HTML-тегов.
     2. Отформатируй все блоки кода и шаблоны промптов текстовыми символами >>> с отступами.
     3. Сохрани глубокую экспертность, мастер-класс и лид-магниты (CTA).
-    4. Создай новый уникальный сюжетный image_prompt на английском языке для генерации обложки.
+    4. Создай новый уникальный сюжетный image_prompt на английском языке для редакционной фотографии (Editorial Documentary Photography, Leica M11, 35mm, мягкий свет, без 3D-графики, без неона и без роботов).
     """
     
     print(f"Запрос к Gemini API для адаптации Дзен-статьи: '{dzen_title}'...")
@@ -96,6 +101,10 @@ def _generate_with_gemini(client, prompt: str) -> dict:
                 
     try:
         post_json = json.loads(response.text)
+        # Принудительная защита контекста 2026 года
+        for key in ["title", "formatted_text"]:
+            if key in post_json and isinstance(post_json[key], str):
+                post_json[key] = post_json[key].replace("2024", "2026").replace("2025", "2026")
         print("Пост успешно сгенерирован ИИ для ВКонтакте!")
         return post_json
     except Exception as e:
@@ -104,7 +113,6 @@ def _generate_with_gemini(client, prompt: str) -> dict:
         raise e
 
 if __name__ == "__main__":
-    # Тестовый запуск
     import dotenv
     dotenv.load_dotenv()
     test_article = {
@@ -115,9 +123,5 @@ if __name__ == "__main__":
     try:
         res = generate_post_from_rss(test_article)
         print(json.dumps(res, indent=2, ensure_ascii=False))
-        
-        print("\n--- ТЕСТ АДАПТАЦИИ СТАТЬИ ДЗЕНА ---")
-        res_dzen = adapt_dzen_article_to_vk("5 способов ускорить Python в 2026 году", "Python остается самым популярным языком для ИИ, но он медленный. В этой статье мы рассмотрим 5 практических трюков: от компилятора Numba до использования библиотек на Rust. Шаблон промпта для рефакторинга кода в GPT-4o: [вставить промпт].")
-        print(json.dumps(res_dzen, indent=2, ensure_ascii=False))
     except Exception as e:
         print("Ошибка при тестировании:", e)

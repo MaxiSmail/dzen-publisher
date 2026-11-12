@@ -40,9 +40,11 @@ def generate_post_from_article(article_data: dict) -> dict:
     {raw_content}
     
     Требования:
-    1. Напиши цепляющий пост на русском языке с использованием HTML-разметки (<b>жирный</b>, <i>курсив</i>).
-    2. Добавь 3-5 хэштегов в конце.
-    3. Создай подробный английский промпт (image_prompt) для футуристичной 3D-иллюстрации к новости. Не вставляй ссылки на сторонние сайты.
+    1. Напиши емкий, цепляющий пост на русском языке с использованием HTML-разметки (<b>жирный</b>, <i>курсив</i>).
+    2. ДЛИНА ТЕКСТА: СТРОГО от 600 до 850 символов (чтобы текст целиком помещался в подпись к фотографии в Telegram).
+    3. Добавь 3-5 хэштегов в конце.
+    4. Создай подробный английский промпт (image_prompt) для премиальной редакционной фотографии (Editorial Documentary Photography в стиле Wired/Bloomberg, 35mm film, Leica M11, мягкий дневной свет, реальные материалы).
+       СТРОГО ЗАПРЕЩЕНО: Никакого 3D-рендера, CGI, киберпанка, неонового свечения, светящихся роботов и голограмм! Фото должно выглядеть как настоящий живой кадр.
     """
     
     print(f"Запрос к Gemini API для переработки статьи: '{raw_title}'...")
@@ -67,34 +69,33 @@ def generate_post_from_article(article_data: dict) -> dict:
                 time.sleep(10)
             else:
                 raise e
-
+                
     try:
-        post_json = json.loads(response.text)
+        post_data = json.loads(response.text)
         
-        text = post_json.get("formatted_text", "")
-        cta = config.MONETIZATION_CTA if config.MONETIZATION_CTA else ""
+        # Защита от устаревшего контекста: принудительно заменяем прошлые годы на 2026
+        for key in ["title", "formatted_text"]:
+            if key in post_data and isinstance(post_data[key], str):
+                post_data[key] = post_data[key].replace("2024", "2026").replace("2025", "2026")
         
-        # Гарантированная защита от превышения лимита Telegram (4096 символов для sendMessage)
-        max_text_len = 4000 - len(cta)
-        if len(text) > max_text_len:
-            text = text[:max_text_len - 3] + "..."
+        # Гарантируем наличие ссылки на источник
+        if link and link not in post_data.get("formatted_text", ""):
+            post_data["formatted_text"] += f'\n\n🔗 <a href="{link}">Читать первоисточник</a>'
             
-        if cta and cta.strip() not in text:
-            text += cta
-            
-        post_json["formatted_text"] = text
-        print(f"Пост успешно сгенерирован ИИ! Длина подписи: {len(text)} символов.")
-        return post_json
+        print("Пост успешно сгенерирован ИИ!")
+        return post_data
     except Exception as e:
         print(f"Ошибка парсинга ответа от Gemini: {e}")
-        print("Сырой ответ:", response.text)
         raise e
 
 if __name__ == "__main__":
     test_article = {
-        "title": "OpenAI представила новую модель GPT-5",
-        "link": "https://example.com/gpt5",
-        "content": "Компания OpenAI сегодня официально объявила о выходе новой флагманской нейросети..."
+        "title": "OpenAI представила новую модель с поддержкой автономных агентов",
+        "content": "Сегодня компания OpenAI анонсировала масштабное обновление...",
+        "link": "https://example.com/test-ai-news"
     }
-    res = generate_post_from_article(test_article)
-    print(json.dumps(res, indent=2, ensure_ascii=False))
+    try:
+        res = generate_post_from_article(test_article)
+        print("Сгенерированный пост:\n", res["formatted_text"])
+    except Exception as e:
+        print("Ошибка генерации:", e)

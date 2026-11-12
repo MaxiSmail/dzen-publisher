@@ -26,16 +26,17 @@ def create_vk_poll(question: str, options: list, group_id_int: int, token: str) 
             print(f"Опрос успешно создан в ВК: {attachment_str}")
             return attachment_str
         elif "error" in data:
-            print(f"⚠️ Ошибка создания опроса VK API: {data['error']['error_msg']}")
+            print(f"⚠️ Опрос пропущен: {data['error']['error_msg']}")
     except Exception as e:
         print(f"⚠️ Исключение при создании опроса в ВК: {e}")
     return None
 
 def publish_to_vk(formatted_text: str, image_path: Path = None, poll_question: str = None, poll_options: list = None) -> bool:
-    token = config.VK_ACCESS_TOKEN
+    post_token = config.VK_ACCESS_TOKEN
+    upload_token = config.VK_USER_TOKEN or config.VK_ACCESS_TOKEN
     group_id = config.VK_GROUP_ID
     
-    if not token or not group_id:
+    if not post_token or not group_id:
         print("Ошибка: VK_ACCESS_TOKEN или VK_GROUP_ID не заданы в .env!")
         return False
         
@@ -49,14 +50,14 @@ def publish_to_vk(formatted_text: str, image_path: Path = None, poll_question: s
     
     attachments = []
     
-    # 1. Загрузка обложки
+    # 1. Загрузка обложки на стену группы
     if image_path and Path(image_path).exists():
         try:
-            print("[1/3] Получение сервера загрузки фото...")
+            print("[1/3] Получение сервера загрузки фото на стену...")
             upload_server_url = "https://api.vk.com/method/photos.getWallUploadServer"
             params = {
                 "group_id": group_id_int,
-                "access_token": token,
+                "access_token": upload_token,
                 "v": "5.131"
             }
             res = requests.get(upload_server_url, params=params, timeout=20)
@@ -73,14 +74,14 @@ def publish_to_vk(formatted_text: str, image_path: Path = None, poll_question: s
                 upload_res.raise_for_status()
                 upload_data = upload_res.json()
                 
-                print("[3/3] Сохранение фото в альбоме группы...")
+                print("[3/3] Сохранение фото в альбоме стены группы...")
                 save_photo_url = "https://api.vk.com/method/photos.saveWallPhoto"
                 save_params = {
                     "group_id": group_id_int,
                     "server": upload_data["server"],
                     "photo": upload_data["photo"],
                     "hash": upload_data["hash"],
-                    "access_token": token,
+                    "access_token": upload_token,
                     "v": "5.131"
                 }
                 save_res = requests.post(save_photo_url, data=save_params, timeout=20)
@@ -91,13 +92,19 @@ def publish_to_vk(formatted_text: str, image_path: Path = None, poll_question: s
                     photo_info = save_data["response"][0]
                     photo_attachment = f"photo{photo_info['owner_id']}_{photo_info['id']}"
                     attachments.append(photo_attachment)
-                    print(f"Фото успешно прикреплено: {photo_attachment}")
+                    print(f"✅ Фото успешно прикреплено к посту: {photo_attachment}")
+                elif "error" in save_data:
+                    print(f"⚠️ Ошибка сохранения фото: {save_data['error'].get('error_msg')}")
+            elif "error" in server_data:
+                err_msg = server_data['error'].get('error_msg')
+                print(f"ℹ️ Прямая загрузка фото через текущий токен недоступна: {err_msg}")
+                print("   (VK API требует User Token администратора для photos.getWallUploadServer; публикация продолжится со сниппетом ссылки)")
         except Exception as img_err:
             print(f"⚠️ Не удалось загрузить картинку в ВК ({img_err}).")
 
-    # 2. Создание интерактивного опроса
+    # 2. Создание интерактивного опроса (если поддерживается токеном)
     if poll_question and poll_options:
-        poll_attachment = create_vk_poll(poll_question, poll_options, group_id_int, token)
+        poll_attachment = create_vk_poll(poll_question, poll_options, group_id_int, post_token)
         if poll_attachment:
             attachments.append(poll_attachment)
 
@@ -108,7 +115,7 @@ def publish_to_vk(formatted_text: str, image_path: Path = None, poll_question: s
             "owner_id": -group_id_int,
             "from_group": 1,
             "message": formatted_text,
-            "access_token": token,
+            "access_token": post_token,
             "v": "5.131"
         }
         if attachments:
@@ -118,7 +125,7 @@ def publish_to_vk(formatted_text: str, image_path: Path = None, poll_question: s
         post_res.raise_for_status()
         post_data = post_res.json()
         
-        # Обработка Flood control (код 9)
+        # Обработка Flood control (код 9) с повтором
         if "error" in post_data and post_data["error"].get("error_code") == 9:
             import time
             print("⚠️ VK API Flood control. Ожидание 6 секунд перед повторной попыткой публикации...")
@@ -136,4 +143,3 @@ def publish_to_vk(formatted_text: str, image_path: Path = None, poll_question: s
     except Exception as e:
         print(f"Ошибка при публикации записи на стене ВК: {e}")
         return False
-

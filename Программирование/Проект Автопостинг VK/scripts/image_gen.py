@@ -13,34 +13,36 @@ if hasattr(sys.stderr, 'reconfigure'):
 
 def generate_image(prompt: str, topic_keyword: str = "technology") -> tuple:
     """
-    Многоядерный каскадный генератор обложек (100% бесплатный, без API-ключей).
-    Чередует ИИ-модели и фотобанки для гарантированного наличия качественной картинки.
+    Генератор фотореалистичных обложек для VK в редакционном стиле (FLUX).
+    Исключает дешевый пластиковый ИИ-стиль (неон, роботы, 3D-рендеры).
     """
-    print(f"Каскадная генерация обложки по промпту: '{prompt[:60]}...'")
-    encoded_prompt = urllib.parse.quote(prompt)
+    print(f"Каскадная генерация редакционной обложки (FLUX): '{prompt[:60]}...'")
+    
+    enhanced_prompt = (
+        f"{prompt}. Shot on 35mm film, Leica M11, natural daylight, "
+        f"subtle grain, authentic atmosphere, editorial magazine photography. "
+        f"Avoid: 3d render, cgi, cartoon, neon glow, blue holograms, glowing circuits, "
+        f"robot faces, cyberpunk, plastic skin, anime, text, typography, watermark"
+    )
+    
+    encoded_prompt = urllib.parse.quote(enhanced_prompt)
     seed = random.randint(1, 1000000)
     output_path = config.IMAGE_DIR / f"vk_post_{seed}.jpg"
     
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     }
 
-    # 1. Список бесплатных ИИ-моделей
     ai_engines = [
-        ("Pollinations Turbo", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&model=turbo&nologo=true&seed={seed}"),
-        ("Pollinations Flux-Realism", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&model=flux-realism&nologo=true&seed={seed}"),
-        ("Pollinations Any-Dark", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&model=any-dark&nologo=true&seed={seed}"),
-        ("Pollinations Flux-Anime", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&model=flux-anime&nologo=true&seed={seed}")
+        ("Pollinations FLUX", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1200&height=675&model=flux&nologo=true&seed={seed}"),
+        ("Pollinations FLUX-Realism", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1200&height=675&model=flux-realism&nologo=true&seed={seed}")
     ]
-    
-    # Случайная ротация моделей для разнообразия стилей
-    random.shuffle(ai_engines)
     
     for engine_name, url in ai_engines:
         try:
             print(f"Попытка через ИИ-движок: {engine_name}...")
-            response = requests.get(url, headers=headers, timeout=25)
-            if response.status_code == 200 and len(response.content) > 3000:
+            response = requests.get(url, headers=headers, timeout=40)
+            if response.status_code == 200 and len(response.content) > 10000:
                 with open(output_path, "wb") as f:
                     f.write(response.content)
                 print(f"✅ Обложка успешно сгенерирована движком '{engine_name}' ({len(response.content)} байт): {output_path}")
@@ -51,23 +53,22 @@ def generate_image(prompt: str, topic_keyword: str = "technology") -> tuple:
             print(f"Движок '{engine_name}' недоступен: {e}")
         time.sleep(1)
 
-    # 2. Резервный фотобанк HD-изображений технологий
-    print("⚠️ ИИ-движки перегружены. Загружаем высококачественное фоновое HD-фото технологий...")
+    print("⚠️ ИИ-движки перегружены. Загружаем HD-фотографию из резервного фотобанка...")
     fallback_urls = [
-        f"https://loremflickr.com/1024/768/{urllib.parse.quote(topic_keyword)}",
-        "https://loremflickr.com/1024/768/technology,ai"
+        "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&h=675&q=80",
+        "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&h=675&q=80"
     ]
     
     for fb_url in fallback_urls:
         try:
-            res = requests.get(fb_url, headers=headers, allow_redirects=True, timeout=15)
-            if res.status_code == 200 and len(res.content) > 3000:
+            res = requests.get(fb_url, headers=headers, timeout=20)
+            if res.status_code == 200 and len(res.content) > 10000:
                 with open(output_path, "wb") as f:
                     f.write(res.content)
-                print(f"✅ Резервная обложка загружена из фотобанка ({len(res.content)} байт): {output_path}")
+                print(f"✅ Резервная обложка загружена ({len(res.content)} байт): {output_path}")
                 return output_path, fb_url
         except Exception as fb_err:
             print(f"Ошибка резервного фотобанка: {fb_err}")
             
-    print("⚠️ Все попытки исчерпаны. Переход в текстовый режим публикации.")
+    print("⚠️ Все попытки исчерпаны.")
     return None, None
