@@ -1,4 +1,3 @@
-import urllib.parse
 import requests
 import random
 import time
@@ -13,11 +12,15 @@ if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8')
 
 def try_google_nano_banana(prompt: str, output_path: Path) -> bool:
-    """Генерация через Google Gemini Nano Banana 2.1 (Interactions API)."""
+    """
+    Генерация через официальный API Google Gemini Nano Banana 2.1 (Interactions API).
+    Требует проект с Pay-as-you-go биллингом в Google AI Studio.
+    """
     if not config.GEMINI_API_KEY:
+        print("Ошибка: GEMINI_API_KEY не задан в конфигурации!")
         return False
     try:
-        print("Попытка генерации через Google Gemini Nano Banana 2.1...")
+        print("Запуск официального генератора Google Gemini Nano Banana 2.1...")
         res = requests.post(
             "https://generativelanguage.googleapis.com/v1beta/interactions",
             headers={
@@ -34,7 +37,7 @@ def try_google_nano_banana(prompt: str, output_path: Path) -> bool:
                     "aspect_ratio": "16:9"
                 }
             },
-            timeout=40
+            timeout=50
         )
         if res.status_code == 200:
             data = res.json()
@@ -49,18 +52,18 @@ def try_google_nano_banana(prompt: str, output_path: Path) -> bool:
             if b64_data:
                 with open(output_path, "wb") as f:
                     f.write(base64.b64decode(b64_data))
-                print(f"✅ Премиальная обложка успешно создана через Google Nano Banana 2.1 ({output_path.stat().st_size} байт): {output_path}")
+                print(f"✅ Премиальная обложка успешно сгенерирована через Google Nano Banana ({output_path.stat().st_size} байт): {output_path}")
                 return True
         else:
-            print(f"Google Nano Banana API вернул статус {res.status_code}: {res.text[:120]}")
+            print(f"⚠️ Google Nano Banana вернул код {res.status_code}: {res.text[:160]}")
     except Exception as e:
-        print(f"Google Nano Banana API недоступен: {e}")
+        print(f"⚠️ Ошибка запроса к Google Nano Banana: {e}")
     return False
 
 def generate_and_download_image(prompt: str, filename_prefix: str = "cover") -> Path:
     """
-    Генератор четких журнальных обложек Nano Banana для Дзена (без мыла и артефактов).
-    Исключает дешевый пластиковый ИИ-стиль (неон, роботы, 3D-рендеры).
+    Генератор обложек Nano Banana для Дзена.
+    Сервис Pollinations полностью исключен по требованию пользователя.
     """
     print(f"Генерация обложки Nano Banana: '{prompt[:70]}...'")
     
@@ -74,48 +77,20 @@ def generate_and_download_image(prompt: str, filename_prefix: str = "cover") -> 
     seed = random.randint(1, 1000000)
     output_path = config.IMAGE_DIR / f"{filename_prefix}_{seed}.jpg"
     
-    # 1. Приоритет: Google Gemini Nano Banana 2.1
+    # 1. Приоритетный нативный движок: Google Gemini Nano Banana
     if try_google_nano_banana(enhanced_prompt, output_path):
         return output_path
         
-    encoded_prompt = urllib.parse.quote(enhanced_prompt)
+    # 2. Резервный фотобанк без водяных знаков
+    print("⚠️ Прямой API Nano Banana недоступен (требуется платный API ключ с биллингом).")
+    print("Загружаем чистую HD-фотографию без водяных знаков...")
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     }
-
-    # 2. Быстрые HD ИИ-движки Nano Banana и FLUX
-    engines = [
-        ("Pollinations Nano Banana", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1280&height=720&model=nano-banana&nologo=true&seed={seed}"),
-        ("Pollinations FLUX-Realism", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1280&height=720&model=flux-realism&nologo=true&seed={seed}"),
-        ("Pollinations FLUX", f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1280&height=720&model=flux&nologo=true&seed={seed}")
-    ]
-    
-    for engine_name, url in engines:
-        for attempt in range(2):
-            try:
-                print(f"Попытка генерации через {engine_name}...")
-                response = requests.get(url, headers=headers, timeout=40)
-                if response.status_code == 200 and len(response.content) > 10000:
-                    with open(output_path, "wb") as f:
-                        f.write(response.content)
-                    print(f"✅ Обложка успешно сгенерирована движком '{engine_name}' ({len(response.content)} байт): {output_path}")
-                    return output_path
-                elif response.status_code == 402:
-                    print(f"Движок '{engine_name}' вернул 402 (лимит частоты). Ожидание 3 сек...")
-                    time.sleep(3)
-                else:
-                    print(f"⚠️ {engine_name} вернул статус: {response.status_code}")
-                    break
-            except Exception as e:
-                print(f"⚠️ Ошибка {engine_name}: {e}")
-                break
-        time.sleep(1)
-        
-    # Резервный фотобанк
-    print("⚠️ Генераторы перегружены. Загрузка из фотобанка...")
     fallback_urls = [
         "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1280&h=720&q=85",
-        "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1280&h=720&q=85"
+        "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1280&h=720&q=85",
+        "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1280&h=720&q=85"
     ]
     for fb in fallback_urls:
         try:
@@ -123,6 +98,7 @@ def generate_and_download_image(prompt: str, filename_prefix: str = "cover") -> 
             if res.status_code == 200 and len(res.content) > 10000:
                 with open(output_path, "wb") as f:
                     f.write(res.content)
+                print(f"✅ Загружена чистая HD-обложка ({len(res.content)} байт): {output_path}")
                 return output_path
         except Exception:
             pass
