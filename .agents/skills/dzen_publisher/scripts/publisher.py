@@ -108,13 +108,24 @@ def publish_to_dzen(article_data: dict, image_path: Path = None, headless: bool 
             
             print("4. Ожидаем загрузку редактора...")
             page.wait_for_selector('[contenteditable="true"]', timeout=30000)
-            time.sleep(3.0)
-            page.keyboard.press("Escape") # закрываем онбординг подсказку
+            time.sleep(2.0)
+            
+            # Закрываем любые онбординг-подсказки, оверлеи и модальные окна Дзена
+            for _ in range(3):
+                page.keyboard.press("Escape")
+                time.sleep(0.3)
+            try:
+                page.evaluate("""() => {
+                    const popups = document.querySelectorAll('.ReactModalPortal, .ReactModal__Overlay, [class*="help-popup"], [class*="modal-"], [class*="tooltip"]');
+                    popups.forEach(p => p.remove());
+                }""")
+            except Exception:
+                pass
             time.sleep(1.0)
             
             print("5. Ввод заголовка статьи...")
             title_element = page.locator('[contenteditable="true"]').first
-            title_element.click()
+            title_element.click(force=True)
             time.sleep(0.5)
             type_humanlike(page, article_data["title"])
             print(f"Заголовок успешно набран: '{article_data['title']}'")
@@ -122,7 +133,7 @@ def publish_to_dzen(article_data: dict, image_path: Path = None, headless: bool 
             
             print("6. Фокусируемся на текстовом поле...")
             body_element = page.locator('[contenteditable="true"]').nth(1)
-            body_element.click()
+            body_element.click(force=True)
             time.sleep(1.0)
             
             # Вставка обложки статьи через нативный файловый загрузчик Дзена
@@ -171,7 +182,7 @@ def publish_to_dzen(article_data: dict, image_path: Path = None, headless: bool 
             print("7. Поиск кнопки 'Опубликовать'...")
             publish_btn = page.locator('button:has-text("Опубликовать")').first
             publish_btn.wait_for(state="visible", timeout=15000)
-            publish_btn.click()
+            publish_btn.click(force=True)
             print("Нажата первая кнопка публикации...")
             time.sleep(3.0)
             
@@ -180,7 +191,7 @@ def publish_to_dzen(article_data: dict, image_path: Path = None, headless: bool 
                 try:
                     tags_input = page.locator('input[placeholder*="Тег"], input[placeholder*="тег"]').first
                     if tags_input.is_visible(timeout=5000):
-                        tags_input.click()
+                        tags_input.click(force=True)
                         time.sleep(0.5)
                         for tag in article_data["tags"]:
                             type_humanlike(page, tag)
@@ -195,7 +206,7 @@ def publish_to_dzen(article_data: dict, image_path: Path = None, headless: bool 
             final_publish_btn = page.locator('button:has-text("Опубликовать")').last
             final_publish_btn.wait_for(state="visible", timeout=15000)
             time.sleep(1.5)
-            final_publish_btn.click()
+            final_publish_btn.click(force=True)
             print("Финальная кнопка публикации нажата!")
             
             time.sleep(6.0)
