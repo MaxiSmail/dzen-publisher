@@ -2,13 +2,12 @@ name: Dzen AI Channel Auto Publisher
 
 on:
   schedule:
-    # Ежедневный автоматический запуск по расписанию
+    # Запуск каждый день в 10:00 UTC (13:00 МСК)
     - cron: '0 10 * * *'
-  # Кнопка мгновенного ручного запуска
   workflow_dispatch:
     inputs:
       immediate:
-        description: 'Опубликовать немедленно без задержки'
+        description: 'Publish immediately without delay'
         required: false
         type: boolean
         default: true
