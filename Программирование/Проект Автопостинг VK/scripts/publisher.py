@@ -118,6 +118,14 @@ def publish_to_vk(formatted_text: str, image_path: Path = None, poll_question: s
         post_res.raise_for_status()
         post_data = post_res.json()
         
+        # Обработка Flood control (код 9)
+        if "error" in post_data and post_data["error"].get("error_code") == 9:
+            import time
+            print("⚠️ VK API Flood control. Ожидание 6 секунд перед повторной попыткой публикации...")
+            time.sleep(6.0)
+            post_res = requests.post(post_url, data=post_params, timeout=20)
+            post_data = post_res.json()
+
         if "error" in post_data:
             print(f"Ошибка VK API (wall.post): {post_data['error']['error_msg']}")
             return False

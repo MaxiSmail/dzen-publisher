@@ -115,7 +115,8 @@ def run_mode_dzen_adaptation():
         return
         
     if not feed.entries:
-        print("Лента Дзен пуста или недоступна.")
+        print("Лента Дзен пуста или защищена SSO-экраном. Автоматически переключаемся на резервную публикацию из RSS...")
+        run_mode_own_rss()
         return
         
     latest_entry = feed.entries[0]
