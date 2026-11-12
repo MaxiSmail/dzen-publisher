@@ -30,6 +30,7 @@ dist-ssr/
 out/
 .next/
 .nuxt/
+.agents/skills/canvas-design/canvas-fonts/
 
 # Environment Secrets
 .env
