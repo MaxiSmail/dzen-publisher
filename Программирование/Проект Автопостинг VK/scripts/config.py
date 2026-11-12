@@ -10,6 +10,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 VK_ACCESS_TOKEN = os.getenv("VK_ACCESS_TOKEN")
 VK_USER_TOKEN = os.getenv("VK_USER_TOKEN")
 VK_GROUP_ID = os.getenv("VK_GROUP_ID")
+HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_TOKEN")
 
 DZEN_CHANNEL_RSS = "https://dzen.ru/rss/id/623c51ed88b1104ddc4eb738"
 

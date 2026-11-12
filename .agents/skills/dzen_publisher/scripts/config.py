@@ -11,6 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent
 
 # API Ключ для Gemini
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_TOKEN")
 
 # Папка для профиля браузера (сохранение авторизации)
 USER_DATA_DIR = Path.home() / ".dzen_profile"

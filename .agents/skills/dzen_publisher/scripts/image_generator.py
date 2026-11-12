@@ -11,16 +11,54 @@ if hasattr(sys.stdout, 'reconfigure'):
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8')
 
-def try_google_nano_banana(prompt: str, output_path: Path) -> bool:
+def try_huggingface_flux(prompt: str, output_path: Path) -> bool:
     """
-    Генерация через официальный API Google Gemini Nano Banana 2.1 (Interactions API).
-    Требует проект с Pay-as-you-go биллингом в Google AI Studio.
+    Генерация через официальный Hugging Face Serverless API: Black Forest Labs FLUX.1 [schnell].
+    Полностью бесплатно, без водяных знаков, максимальная фотореалистичность.
     """
-    if not config.GEMINI_API_KEY:
-        print("Ошибка: GEMINI_API_KEY не задан в конфигурации!")
+    if not config.HF_TOKEN:
         return False
     try:
-        print("Запуск официального генератора Google Gemini Nano Banana 2.1...")
+        print("Попытка генерации через Hugging Face (FLUX.1-schnell)...")
+        api_url = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell"
+        headers = {
+            "Authorization": f"Bearer {config.HF_TOKEN}",
+            "User-Agent": "Mozilla/5.0"
+        }
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "num_inference_steps": 4,
+                "width": 1024,
+                "height": 576
+            }
+        }
+        
+        for attempt in range(3):
+            res = requests.post(api_url, headers=headers, json=payload, timeout=60)
+            if res.status_code == 200 and len(res.content) > 10000:
+                with open(output_path, "wb") as f:
+                    f.write(res.content)
+                print(f"✅ Премиальная обложка FLUX.1 успешно сгенерирована через Hugging Face ({len(res.content)} байт): {output_path}")
+                return True
+            elif res.status_code == 503:
+                data = res.json() if "application/json" in res.headers.get("content-type", "") else {}
+                est_time = data.get("estimated_time", 15)
+                print(f"Hugging Face прогревает модель (ожидание ~{est_time:.0f}с)...")
+                time.sleep(min(est_time, 20))
+            else:
+                print(f"Hugging Face API вернул код {res.status_code}: {res.text[:120]}")
+                break
+    except Exception as e:
+        print(f"Hugging Face API недоступен: {e}")
+    return False
+
+def try_google_nano_banana(prompt: str, output_path: Path) -> bool:
+    """Генерация через официальный API Google Gemini Nano Banana 2.1."""
+    if not config.GEMINI_API_KEY:
+        return False
+    try:
+        print("Попытка генерации через Google Gemini Nano Banana 2.1...")
         res = requests.post(
             "https://generativelanguage.googleapis.com/v1beta/interactions",
             headers={
@@ -55,17 +93,16 @@ def try_google_nano_banana(prompt: str, output_path: Path) -> bool:
                 print(f"✅ Премиальная обложка успешно сгенерирована через Google Nano Banana ({output_path.stat().st_size} байт): {output_path}")
                 return True
         else:
-            print(f"⚠️ Google Nano Banana вернул код {res.status_code}: {res.text[:160]}")
+            print(f"Google Nano Banana вернул код {res.status_code}: {res.text[:120]}")
     except Exception as e:
-        print(f"⚠️ Ошибка запроса к Google Nano Banana: {e}")
+        print(f"Google Nano Banana API недоступен: {e}")
     return False
 
 def generate_and_download_image(prompt: str, filename_prefix: str = "cover") -> Path:
     """
-    Генератор обложек Nano Banana для Дзена.
-    Сервис Pollinations полностью исключен по требованию пользователя.
+    Генератор обложек FLUX / Nano Banana для Дзена БЕЗ водяных знаков.
     """
-    print(f"Генерация обложки Nano Banana: '{prompt[:70]}...'")
+    print(f"Генерация фотореалистичной обложки для Дзена: '{prompt[:70]}...'")
     
     enhanced_prompt = (
         f"{prompt}. Shot on 35mm film, Leica M11, 50mm f/1.4 lens, natural soft daylight, "
@@ -77,13 +114,16 @@ def generate_and_download_image(prompt: str, filename_prefix: str = "cover") -> 
     seed = random.randint(1, 1000000)
     output_path = config.IMAGE_DIR / f"{filename_prefix}_{seed}.jpg"
     
-    # 1. Приоритетный нативный движок: Google Gemini Nano Banana
+    # 1. Приоритет: Hugging Face FLUX.1 [schnell]
+    if try_huggingface_flux(enhanced_prompt, output_path):
+        return output_path
+        
+    # 2. Приоритет: Google Gemini Nano Banana 2.1
     if try_google_nano_banana(enhanced_prompt, output_path):
         return output_path
         
-    # 2. Резервный фотобанк без водяных знаков
-    print("⚠️ Прямой API Nano Banana недоступен (требуется платный API ключ с биллингом).")
-    print("Загружаем чистую HD-фотографию без водяных знаков...")
+    # 3. Резервный фотобанк без водяных знаков
+    print("⚠️ API-генераторы недоступны. Загружаем HD-фотографию из открытого фотобанка...")
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     }
