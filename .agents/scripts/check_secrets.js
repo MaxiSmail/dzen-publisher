@@ -18,7 +18,7 @@ const secretPatterns = [
 
 let stagedFiles = [];
 try {
-  const output = execSync('git diff --cached --name-only', { cwd: antigravityRoot, encoding: 'utf8' });
+  const output = execSync('git --no-optional-locks diff --cached --name-only', { cwd: antigravityRoot, encoding: 'utf8', timeout: 3000 });
   stagedFiles = output.split(/\r?\n/).filter(f => f.trim().length > 0);
 } catch (e) {
   stagedFiles = [];
