@@ -148,14 +148,18 @@ def publish_to_dzen(article_data: dict, image_path: Path = None, headless: bool 
                 raise RuntimeError(f"Не удалось подключиться к Студии Дзена после нескольких попыток: {last_err}")
             
             print("2. Открываем меню добавления публикации...")
-            add_btn = page.locator('[class*="addButton"], button:has-text("Создать"), [aria-label*="Создать"]').first
+            add_btn = page.locator('[class*="addButton"]').first
             add_btn.wait_for(state="visible", timeout=20000)
             add_btn.click()
             time.sleep(1.5)
             
             print("3. Выбираем 'Написать статью'...")
-            art_btn = page.locator('text="Написать статью", [aria-label*="статью"], button:has-text("Статью")').first
-            art_btn.wait_for(state="visible", timeout=20000)
+            art_btn = page.get_by_text("Написать статью").first
+            try:
+                art_btn.wait_for(state="visible", timeout=10000)
+            except Exception:
+                art_btn = page.locator('text="Написать статью"').first
+                art_btn.wait_for(state="visible", timeout=10000)
             art_btn.click()
             
             print("4. Ожидаем загрузку редактора...")
