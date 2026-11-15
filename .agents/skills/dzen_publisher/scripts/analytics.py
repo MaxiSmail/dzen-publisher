@@ -65,8 +65,13 @@ def collect_analytics() -> dict:
         try:
             print("1. Переход в статистику публикаций...")
             stats_url = f"{BASE_STUDIO_URL}/publications-stat"
-            page.goto(stats_url, wait_until="networkidle", timeout=60000)
-            time.sleep(4)
+            try:
+                page.goto(stats_url, wait_until="domcontentloaded", timeout=35000)
+            except Exception as e_stat:
+                print(f"⚠️ Предупреждение: первичная загрузка статистики: {e_stat}. Повтор...")
+                time.sleep(3)
+                page.goto(stats_url, wait_until="domcontentloaded", timeout=35000)
+            time.sleep(3)
             
             stats_screenshot = config.BASE_DIR / "analytics_stats.png"
             page.screenshot(path=str(stats_screenshot))
@@ -76,8 +81,13 @@ def collect_analytics() -> dict:
             
             print("2. Переход в раздел Монетизация...")
             money_url = f"{BASE_STUDIO_URL}/money"
-            page.goto(money_url, wait_until="networkidle", timeout=60000)
-            time.sleep(4)
+            try:
+                page.goto(money_url, wait_until="domcontentloaded", timeout=35000)
+            except Exception as e_mon:
+                print(f"⚠️ Предупреждение: первичная загрузка монетизации: {e_mon}. Повтор...")
+                time.sleep(3)
+                page.goto(money_url, wait_until="domcontentloaded", timeout=35000)
+            time.sleep(3)
             
             money_screenshot = config.BASE_DIR / "analytics_monetization.png"
             page.screenshot(path=str(money_screenshot))

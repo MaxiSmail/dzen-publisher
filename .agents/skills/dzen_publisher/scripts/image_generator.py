@@ -125,7 +125,7 @@ def try_google_nano_banana(prompt: str, output_path: Path) -> bool:
         print(f"Google Nano Banana API недоступен: {e}")
     return False
 
-def generate_cover_image(article_title: str, topic_keyword: str = "technology") -> Path:
+def generate_cover_image(article_title_or_prompt: str, topic_keyword: str = "technology", filename_prefix: str = "cover") -> Path:
     """
     Генератор премиальных фотореалистичных обложек для Дзена БЕЗ водяных знаков.
     Приоритет 1: Cloudflare Workers AI FLUX.1 [schnell] (бесплатно, чистый файл).
@@ -133,18 +133,22 @@ def generate_cover_image(article_title: str, topic_keyword: str = "technology") 
     Приоритет 3: Google Gemini Nano Banana.
     Резерв: Чистая HD-фотография из открытого фотобанка.
     """
-    print(f"Генерация фотореалистичной обложки для статьи: '{article_title[:60]}...'")
+    print(f"Генерация фотореалистичной обложки для статьи: '{article_title_or_prompt[:60]}...'")
     
-    prompt = (
-        f"Authentic editorial documentary photograph representing {topic_keyword} and innovation: {article_title}. "
-        f"Shot on 35mm film, Leica M11, 50mm f/1.4 lens, natural daylight, soft atmospheric shadows, "
-        f"razor sharp focus, highly detailed real materials, crisp edges, cinematic composition. "
-        f"Avoid: blur, motion blur, compression artifacts, noise, distorted shapes, 3d render, cgi, cartoon, neon glow, blue holograms, glowing circuits, "
-        f"robot faces, cyberpunk, plastic skin, anime, text, typography, watermark"
-    )
+    text_lower = article_title_or_prompt.lower()
+    if any(k in text_lower for k in ["photograph", "shot on", "film", "leica", "lighting", "cinematic", "documentary"]):
+        prompt = article_title_or_prompt
+    else:
+        prompt = (
+            f"Authentic editorial documentary photograph representing {topic_keyword} and innovation: {article_title_or_prompt}. "
+            f"Shot on 35mm film, Leica M11, 50mm f/1.4 lens, natural daylight, soft atmospheric shadows, "
+            f"razor sharp focus, highly detailed real materials, crisp edges, cinematic composition. "
+            f"Avoid: blur, motion blur, compression artifacts, noise, distorted shapes, 3d render, cgi, cartoon, neon glow, blue holograms, glowing circuits, "
+            f"robot faces, cyberpunk, plastic skin, anime, text, typography, watermark"
+        )
     
     seed = random.randint(1, 1000000)
-    output_path = config.IMAGE_DIR / f"cover_{seed}.jpg"
+    output_path = config.IMAGE_DIR / f"{filename_prefix}_{seed}.jpg"
     
     # 1. Приоритет: Cloudflare Workers AI FLUX.1 [schnell]
     if try_cloudflare_flux(prompt, output_path):
@@ -182,3 +186,8 @@ def generate_cover_image(article_title: str, topic_keyword: str = "technology") 
             
     print("⚠️ Не удалось получить обложку.")
     return None
+
+def generate_and_download_image(prompt_or_title: str, filename_prefix: str = "dzen_cover", topic_keyword: str = "technology") -> Path:
+    """Совместимый интерфейс для вызова из main.py."""
+    return generate_cover_image(prompt_or_title, topic_keyword=topic_keyword, filename_prefix=filename_prefix)
+
