@@ -54,21 +54,31 @@ def publish_to_dzen(article_data: dict, image_path: Path = None, headless: bool 
 
     with sync_playwright() as p:
         print("Запуск браузера...")
+        browser_args = [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-blink-features=AutomationControlled",
+            "--disable-features=IsolateOrigins,site-per-process"
+        ]
+        
         if storage_state_path:
             browser = p.chromium.launch(
                 headless=headless,
-                args=["--no-sandbox", "--disable-blink-features=AutomationControlled"]
+                args=browser_args
             )
             context = browser.new_context(
                 storage_state=str(storage_state_path),
+                viewport={"width": 1920, "height": 1080},
+                device_scale_factor=1,
                 permissions=["clipboard-read", "clipboard-write"],
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
             )
         else:
             context = p.chromium.launch_persistent_context(
                 user_data_dir=str(config.USER_DATA_DIR),
                 headless=headless,
-                args=["--no-sandbox", "--disable-blink-features=AutomationControlled", "--start-maximized"],
+                args=browser_args + ["--start-maximized"],
                 no_viewport=True,
                 permissions=["clipboard-read", "clipboard-write"]
             )
@@ -76,34 +86,80 @@ def publish_to_dzen(article_data: dict, image_path: Path = None, headless: bool 
         page = context.pages[0] if context.pages else context.new_page()
         
         try:
-            print("1. Переход в Студию Дзена...")
-            page.goto("https://dzen.ru/profile/editor/neuro_hacks_ai", wait_until="domcontentloaded", timeout=60000)
-            time.sleep(random.uniform(3.0, 5.0))
-            page.keyboard.press("Escape")
-            time.sleep(1.0)
+            print("1. Открытие Студии Дзена (отказоустойчивый переход с автоповторами)...")
+            channel_id = getattr(config, "CHANNEL_ID", "623c51ed88b1104ddc4eb738")
+            channel_slug = getattr(config, "CHANNEL_SLUG", "neuro_hacks_ai")
             
-            # Проверка слетевшей авторизации (редирект на паспорт или форму логина)
-            current_url = page.url
-            if "passport.yandex" in current_url or "dzen.ru/auth" in current_url:
-                print(f"❌ КРИТИЧЕСКАЯ ОШИБКА: Авторизация Дзена истекла! Текущий URL: {current_url}")
-                err_screenshot = config.BASE_DIR / "error_screenshot.png"
-                page.screenshot(path=str(err_screenshot))
-                telegram_notifier.send_error_notification(
-                    "Сессия Яндекс.Дзена истекла (редирект на страницу входа). Запустите login.bat для обновления профиля!",
-                    screenshot_path=err_screenshot
-                )
-                context.close()
-                return False
+            studio_candidates = [
+                f"https://dzen.ru/profile/editor/{channel_slug}",
+                f"https://dzen.ru/profile/editor/id/{channel_id}"
+            ]
+            
+            nav_success = False
+            last_err = None
+            
+            for attempt in range(1, 5):
+                for candidate_url in studio_candidates:
+                    try:
+                        print(f"Попытка {attempt}/4 навигации: {candidate_url}...")
+                        page.goto(candidate_url, wait_until="domcontentloaded", timeout=45000)
+                        time.sleep(random.uniform(2.5, 4.0))
+                        page.keyboard.press("Escape")
+                        time.sleep(1.0)
+                        
+                        current_url = page.url
+                        # Проверка на редирект авторизации
+                        if "passport.yandex" in current_url or "dzen.ru/auth" in current_url:
+                            print(f"❌ КРИТИЧЕСКАЯ ОШИБКА: Авторизация Дзена истекла! Текущий URL: {current_url}")
+                            err_screenshot = config.BASE_DIR / "error_screenshot.png"
+                            page.screenshot(path=str(err_screenshot))
+                            telegram_notifier.send_error_notification(
+                                "Сессия Яндекс.Дзена истекла (редирект на страницу входа). Запустите login.bat для обновления профиля!",
+                                screenshot_path=err_screenshot
+                            )
+                            context.close()
+                            return False
+
+                        if "dzen.ru/profile/editor" in current_url or "dzen.ru/media" in current_url or page.locator('[class*="addButton"], button:has-text("Создать")').count() > 0:
+                            print(f"✅ Успешный вход в Студию Дзена ({current_url})!")
+                            nav_success = True
+                            break
+                    except Exception as e_nav:
+                        last_err = e_nav
+                        print(f"⚠️ Сбой перехода на {candidate_url}: {e_nav}")
+                        time.sleep(3)
+                        
+                if nav_success:
+                    break
+                    
+                # При сетевой ошибке делаем прогрев базового домена
+                try:
+                    print("Прогрев корневого домена https://dzen.ru/...")
+                    page.goto("https://dzen.ru/", wait_until="domcontentloaded", timeout=30000)
+                    time.sleep(3)
+                except Exception:
+                    pass
+                    
+                wait_retry = attempt * 10
+                print(f"Ожидание {wait_retry} сек. перед повторной попыткой открытия Студии...")
+                time.sleep(wait_retry)
+                
+            if not nav_success:
+                raise RuntimeError(f"Не удалось подключиться к Студии Дзена после нескольких попыток: {last_err}")
             
             print("2. Открываем меню добавления публикации...")
             add_btn = page.locator('[class*="addButton"]').first
-            add_btn.wait_for(state="visible", timeout=15000)
+            add_btn.wait_for(state="visible", timeout=20000)
             add_btn.click()
             time.sleep(1.5)
             
             print("3. Выбираем 'Написать статью'...")
-            art_btn = page.locator('text="Написать статью"').first
-            art_btn.wait_for(state="visible", timeout=15000)
+            art_btn = page.get_by_text("Написать статью").first
+            try:
+                art_btn.wait_for(state="visible", timeout=10000)
+            except Exception:
+                art_btn = page.locator('text="Написать статью"').first
+                art_btn.wait_for(state="visible", timeout=10000)
             art_btn.click()
             
             print("4. Ожидаем загрузку редактора...")

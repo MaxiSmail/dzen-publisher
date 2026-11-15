@@ -15,6 +15,10 @@ HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_TOKEN")
 CF_ACCOUNT_ID = os.getenv("CF_ACCOUNT_ID") or os.getenv("CLOUDFLARE_ACCOUNT_ID")
 CF_API_TOKEN = os.getenv("CF_API_TOKEN") or os.getenv("CLOUDFLARE_API_TOKEN")
 
+# Идентификаторы канала Дзен
+CHANNEL_ID = "623c51ed88b1104ddc4eb738"
+CHANNEL_SLUG = "neuro_hacks_ai"
+
 # Папка для профиля браузера (сохранение авторизации)
 USER_DATA_DIR = Path.home() / ".dzen_profile"
 
